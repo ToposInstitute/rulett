@@ -8,50 +8,8 @@
 
 use super::prelude::*;
 
-/// A declaration in the definition of a signature.
-pub enum SignatureDecl {
-    Sort(Name),
-    Operation(Name, Type, Type),
-}
-
-/// Signature for a rule-based model.
-///
-/// A signature freely generates a theory. For now, a signature is essentially a
-/// Petri net. It should become a Σ-net.
-#[derive(Default)]
-pub struct Signature {
-    sorts: IndexSet<Name>,
-    operations: IndexMap<Name, (Type, Type)>,
-}
-
-impl<T: IntoIterator<Item = SignatureDecl>> From<T> for Signature {
-    fn from(iter: T) -> Self {
-        let mut sig = Self::default();
-        for decl in iter {
-            match decl {
-                SignatureDecl::Sort(name) => {
-                    sig.sorts.insert(name);
-                }
-                SignatureDecl::Operation(name, dom, cod) => {
-                    sig.operations.insert(name, (dom, cod));
-                }
-            }
-        }
-        sig
-    }
-}
-
-/// Type over a signature.
-pub enum Type {
-    /// A basic type, or sort from the signature.
-    Sort(Name),
-
-    /// TODO
-    List(Vec<Type>),
-}
-
 /// Object term.
-pub enum ObTerm {
+pub enum ObTm {
     /// A variable.
     ///
     /// Example syntax: `x`
@@ -60,13 +18,13 @@ pub enum ObTerm {
     /// A list of terms.
     ///
     /// Example syntax: `[x, y, z]`
-    List(Vec<ObTerm>),
+    List(Vec<ObTm>),
 }
 
 /// Morphism term.
 ///
 /// A term in context, modulo alpha-equivalence, is a morphism in the theory.
-pub enum MorTerm {
+pub enum MorTm {
     /// A variable.
     ///
     /// Example syntax: `x`
@@ -75,19 +33,19 @@ pub enum MorTerm {
     /// A list of terms.
     ///
     /// Example syntax: `[x, y, z]`
-    List(Vec<MorTerm>),
+    List(Vec<MorTm>),
 
     /// An application of an operation to a term.
     ///
     /// Example syntax: `f t`, `f [x, y]`
-    App(Name, Box<MorTerm>),
+    App(Name, Box<MorTm>),
 
     /// A let binding.
     ///
     /// Example syntax: `let [x, y] = t in f [y, x]`
     Let {
-        bindings: ObTerm,
-        bound: Box<MorTerm>,
-        body: Box<MorTerm>,
+        bindings: ObTm,
+        bound: Box<MorTm>,
+        body: Box<MorTm>,
     },
 }

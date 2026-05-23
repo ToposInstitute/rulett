@@ -6,11 +6,11 @@ use super::{prelude::*, theory::*};
 pub enum ModelDecl {
     Agent {
         name: Name,
-        interface: ObTerm,
+        interface: ObTm,
     },
     Rule {
         name: Option<Name>,
-        interface: ObTerm,
+        interface: ObTm,
         lhs: Pattern,
         rhs: Pattern,
     },
@@ -21,5 +21,5 @@ pub enum ModelDecl {
 /// A pattern is represented as a restriction of a list of agents along a term.
 pub struct Pattern {
     agents: Vec<Name>,
-    term: MorTerm,
+    term: MorTm,
 }
