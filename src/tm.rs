@@ -4,7 +4,10 @@ use itertools::join;
 use super::{prelude::*, ty::*};
 
 /// Object term.
-#[derive(PartialEq, Eq, Display)]
+///
+/// To be more precise, this is an object term without its type. The judgment
+/// that an object term has a type is represented by [`ObTmJudgment`].
+#[derive(Clone, PartialEq, Eq, Display)]
 pub enum ObTm {
     /// A variable.
     ///
@@ -45,9 +48,9 @@ impl ObTm {
     ///
     /// Returns an error when the term is ill-formed or ill-typed.
     pub fn check(&self, ty: &Ty) -> Result<(), String> {
-        self.check_types(ty)?;
-        self.collect_vars().map_err(|name| format!("variable {name} used twice"))?;
-        Ok(())
+        self.collect_vars()
+            .map_err(|name| format!("variable {name} used twice"))
+            .and_then(|_| self.check_types(ty))
     }
 
     fn check_types(&self, ty: &Ty) -> Result<(), String> {
@@ -104,9 +107,36 @@ impl ObTm {
     }
 }
 
-/// Morphism term.
+/// Judgment that an object term has a type.
 ///
-/// A term in context, modulo alpha-equivalence, is a morphism in the theory.
+/// Such a judgment is guaranteed to be valid since type checking is performed
+/// by the constructor.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ObTmJudgment {
+    tm: ObTm,
+    ty: Ty,
+}
+
+impl ObTmJudgment {
+    /// Tries to judge that the given term has the given type.
+    pub fn judge(tm: ObTm, ty: Ty) -> Result<Self, String> {
+        tm.check(&ty)?;
+        Ok(Self { tm, ty })
+    }
+
+    /// Gets the underlying term.
+    pub fn tm(&self) -> &ObTm {
+        &self.tm
+    }
+
+    /// Gets the underlying type.
+    pub fn ty(&self) -> &Ty {
+        &self.ty
+    }
+}
+
+/// Morphism term (sans domain term and codomain type).
+#[derive(Clone, PartialEq, Eq)]
 pub enum MorTm {
     /// A variable.
     ///
@@ -136,6 +166,37 @@ pub enum MorTm {
         bound: Box<MorTm>,
         body: Box<MorTm>,
     },
+}
+
+impl MorTm {
+    /// Smart constructor for [`Var`](Self::Var) variant.
+    pub fn var(name: impl Into<Name>) -> Self {
+        Self::Var(name.into())
+    }
+
+    /// Smart constructor for [`List`](Self::List) variant.
+    pub fn list(terms: impl IntoIterator<Item = MorTm>) -> Self {
+        Self::List(terms.into_iter().collect())
+    }
+
+    /// Smart constructor for [`Tensor`](Self::Tensor) variant.
+    pub fn tensor(tm: MorTm) -> Self {
+        Self::Tensor(Box::new(tm))
+    }
+
+    /// Smart constructor for [`App`](Self::App) variant.
+    pub fn app(name: impl Into<Name>, tm: MorTm) -> Self {
+        Self::App(name.into(), Box::new(tm))
+    }
+
+    /// Smart constructor for [`Let`](Self::Let) variant.
+    pub fn let_(bindings: ObTm, bound: MorTm, body: MorTm) -> Self {
+        Self::Let {
+            bindings,
+            bound: Box::new(bound),
+            body: Box::new(body),
+        }
+    }
 }
 
 #[cfg(test)]

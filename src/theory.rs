@@ -38,30 +38,40 @@ impl SignatureDecl {
 ///
 /// A signature freely generates a theory. It consists of sets of sorts and
 /// operations.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Signature {
     sorts: IndexSet<Name>,
     operations: IndexMap<Name, (Ty, Ty)>,
 }
 
 impl Signature {
+    /// Constructs an empty signature.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Parses a signature from a list of declarations.
     ///
-    /// If a signature is returned, it is valid; otherwise, the first error
-    /// encountered is reported.
+    /// If a signature is returned, it is guaranteed to be valid; otherwise, the
+    /// first error encountered is reported.
     pub fn parse(decls: impl IntoIterator<Item = SignatureDecl>) -> Result<Self, String> {
-        let mut sig = Self::default();
+        let mut sig = Self::new();
         for decl in decls {
-            match decl {
-                SignatureDecl::Sort(name) => sig
-                    .add_sort(name)
-                    .map_err(|err| format!("cannot declare sort {name}: {err}"))?,
-                SignatureDecl::Operation(name, dom, cod) => sig
-                    .add_operation(name, dom, cod)
-                    .map_err(|err| format!("cannot declare operation {name}: {err}"))?,
-            }
+            sig.declare(decl)?;
         }
         Ok(sig)
+    }
+
+    /// Adds a declaration to the signature.
+    pub fn declare(&mut self, decl: SignatureDecl) -> Result<(), String> {
+        match decl {
+            SignatureDecl::Sort(name) => {
+                self.add_sort(name).map_err(|err| format!("cannot declare sort {name}: {err}"))
+            }
+            SignatureDecl::Operation(name, dom, cod) => self
+                .add_operation(name, dom, cod)
+                .map_err(|err| format!("cannot declare operation {name}: {err}")),
+        }
     }
 
     /// Adds a sort with the given name to the signature.
@@ -92,17 +102,27 @@ impl Signature {
         Ok(())
     }
 
+    /// Iterates over the sorts in the signature.
+    pub fn sorts(&self) -> impl Iterator<Item = Name> {
+        self.sorts.iter().copied()
+    }
+
+    /// Iterates over the operations in the signature.
+    pub fn operations(&self) -> impl Iterator<Item = (Name, &Ty, &Ty)> {
+        self.operations.iter().map(|(name, (dom, cod))| (*name, dom, cod))
+    }
+
     /// Checks a type against the kind and signature.
     ///
     /// Returns an error when the type is not well-kinded or has sorts not
     /// contained in the signature.
     pub fn check_ty(&self, ty: &Ty, kind: &Kind) -> Result<bool, String> {
-        self.check_sorts(ty)
+        self.has_sorts_in(ty)
             .map_err(|name| format!("no such sort {name}"))
             .and_then(|_| ty.check(kind))
     }
 
-    fn check_sorts(&self, ty: &Ty) -> Result<(), Name> {
+    fn has_sorts_in(&self, ty: &Ty) -> Result<(), Name> {
         match ty {
             Ty::Sort(name) => {
                 if !self.sorts.contains(name) {
@@ -111,11 +131,11 @@ impl Signature {
             }
             Ty::List(types) => {
                 for ty in types {
-                    self.check_sorts(ty)?;
+                    self.has_sorts_in(ty)?;
                 }
             }
             Ty::Tensor(ty) => {
-                self.check_sorts(ty)?;
+                self.has_sorts_in(ty)?;
             }
         }
         Ok(())
@@ -124,10 +144,12 @@ impl Signature {
 
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for sort in self.sorts.iter() {
+        writeln!(f, "#/ sorts:")?;
+        for sort in self.sorts() {
             writeln!(f, "{sort}")?;
         }
-        for (op, (dom, cod)) in self.operations.iter() {
+        writeln!(f, "#/ operations:")?;
+        for (op, dom, cod) in self.operations() {
             writeln!(f, "{op} : {dom} → {cod}")?;
         }
         Ok(())
@@ -136,7 +158,7 @@ impl fmt::Display for Signature {
 
 /// Signature for a toy model.
 #[cfg(test)]
-fn toy_signature() -> Signature {
+pub(crate) fn toy_signature() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Res"),
         SignatureDecl::operation("unphos", Ty::list([]), Ty::sort("Res")),
@@ -158,10 +180,12 @@ mod tests {
     use expect_test::expect;
 
     #[test]
-    fn parse_signature() {
+    fn parse() {
         let expected = expect![[r#"
+            #/ sorts:
             Res
             Site
+            #/ operations:
             unphos : [] → Res
             phos : [] → Res
             empty : [] → Site
