@@ -202,6 +202,7 @@ dependencies = [
  "expect-test",
  "indexmap",
  "itertools",
+ "union-find",
  "ustr",
 ]
 
@@ -260,6 +261,12 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "union-find"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "617b646852504df7924cff3b0ca6c8f07a3c91099b48076fab58d4298faf47ca"
 
 [[package]]
 name = "ustr"

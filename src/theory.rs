@@ -10,7 +10,7 @@ use std::fmt;
 
 use super::{prelude::*, ty::*};
 
-/// A declaration in the definition of a signature.
+/// Declaration in the definition of a signature.
 pub enum SignatureDecl {
     /// Declaration of a sort.
     Sort(Name),
@@ -110,6 +110,11 @@ impl Signature {
     /// Iterates over the operations in the signature.
     pub fn operations(&self) -> impl Iterator<Item = (Name, &Ty, &Ty)> {
         self.operations.iter().map(|(name, (dom, cod))| (*name, dom, cod))
+    }
+
+    /// Gets the interface of an operation, if it exists.
+    pub fn interface(&self, name: &Name) -> Option<(&Ty, &Ty)> {
+        self.operations.get(name).map(|(dom, cod)| (dom, cod))
     }
 
     /// Checks a type against the kind and signature.

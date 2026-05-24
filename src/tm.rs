@@ -85,7 +85,7 @@ impl ObTm {
     /// Returns an error containing the offending name if a variable is
     /// encountered twice.
     pub fn collect_vars(&self) -> Result<IndexSet<Name>, Name> {
-        fn recurse(tm: &ObTm, vars: &mut IndexSet<Name>) -> Result<(), Name> {
+        fn recurse(vars: &mut IndexSet<Name>, tm: &ObTm) -> Result<(), Name> {
             match tm {
                 ObTm::Var(name) => {
                     if !vars.insert(*name) {
@@ -94,73 +94,101 @@ impl ObTm {
                 }
                 ObTm::List(terms) => {
                     for tm in terms {
-                        recurse(tm, vars)?;
+                        recurse(vars, tm)?;
                     }
                 }
-                ObTm::Tensor(tm) => recurse(tm, vars)?,
+                ObTm::Tensor(tm) => recurse(vars, tm)?,
             }
             Ok(())
         }
         let mut vars = IndexSet::new();
-        recurse(self, &mut vars)?;
+        recurse(&mut vars, self)?;
         Ok(vars)
     }
 }
 
 /// Judgment that an object term has a type.
-///
-/// Such a judgment is guaranteed to be valid since type checking is performed
-/// by the constructor.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ObTmJudgment {
-    tm: ObTm,
-    ty: Ty,
+    /// The underlying term.
+    pub tm: ObTm,
+    /// The underlying type.
+    pub ty: Ty,
 }
 
 impl ObTmJudgment {
-    /// Tries to judge that the given term has the given type.
+    /// Judges that the given term has the given type, or returns an error.
+    ///
+    /// While a raw constructor is allowed for efficiency in
+    /// correct-by-construction algorithms, this is the preferred way to
+    /// construct a judgment, as it guarantees that the judgment is valid.
     pub fn judge(tm: ObTm, ty: Ty) -> Result<Self, String> {
         tm.check(&ty)?;
         Ok(Self { tm, ty })
     }
 
-    /// Gets the underlying term.
-    pub fn tm(&self) -> &ObTm {
-        &self.tm
-    }
-
-    /// Gets the underlying type.
-    pub fn ty(&self) -> &Ty {
-        &self.ty
+    /// Collects variable-sort pairs from the judgment.
+    ///
+    /// Never panics but the result is undefined if the judgment is invalid.
+    pub fn collect_typed_vars(&self) -> IndexMap<Name, Name> {
+        fn recurse(vars: &mut IndexMap<Name, Name>, tm: &ObTm, ty: &Ty) {
+            match tm {
+                ObTm::Var(name) => {
+                    if let Ty::Sort(sort) = ty {
+                        vars.insert(*name, *sort);
+                    }
+                }
+                ObTm::List(terms) => {
+                    if let Ty::List(types) = ty {
+                        for (tm, ty) in terms.iter().zip(types) {
+                            recurse(vars, tm, ty);
+                        }
+                    }
+                }
+                ObTm::Tensor(tm) => {
+                    if let Ty::Tensor(ty) = ty {
+                        recurse(vars, tm, ty);
+                    }
+                }
+            }
+        }
+        let mut vars = IndexMap::new();
+        recurse(&mut vars, &self.tm, &self.ty);
+        vars
     }
 }
 
 /// Morphism term (sans domain term and codomain type).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Display)]
 pub enum MorTm {
     /// A variable.
     ///
     /// Example syntax: `x`
+    #[display("{_0}")]
     Var(Name),
 
     /// A list of terms.
     ///
     /// Example syntax: `[x, y, z]`
+    #[display("[{}]", join(_0, ", "))]
     List(Vec<MorTm>),
 
     /// An application of the tensor to a term.
     ///
     /// Example syntax: `⊗ [t, s]`
+    #[display("⊗ {_0}")]
     Tensor(Box<MorTm>),
 
     /// An application of an operation in the signature to a term.
     ///
     /// Example syntax: `f t`, `f [x, y]`
+    #[display("{_0} {_1}")]
     App(Name, Box<MorTm>),
 
     /// A let binding.
     ///
     /// Example syntax: `let ⊗ [x, y] = t in f [y, x]`
+    #[display("let {bindings} = {bound} in {body}")]
     Let {
         bindings: ObTm,
         bound: Box<MorTm>,
@@ -197,6 +225,35 @@ impl MorTm {
             body: Box::new(body),
         }
     }
+
+    /// Simultaneously substitutes terms for free variables in the term.
+    ///
+    /// Substitution is not capture-avoiding: callers must ensure that
+    /// substituted terms do not contain free variables clashing with let-bound
+    /// names along the path of substitution.
+    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> MorTm {
+        match self {
+            MorTm::Var(name) => subst
+                .iter()
+                .rev()
+                .find_map(|(n, tm)| (n == name).then(|| tm.clone()))
+                .unwrap_or_else(|| self.clone()),
+            MorTm::List(terms) => MorTm::list(terms.iter().map(|t| t.subst(subst))),
+            MorTm::Tensor(tm) => MorTm::tensor(tm.subst(subst)),
+            MorTm::App(name, tm) => MorTm::app(*name, tm.subst(subst)),
+            MorTm::Let { bindings, bound, body } => {
+                let new_bound = bound.subst(subst);
+                let shadowed = bindings.collect_vars().unwrap_or_default();
+                let n = shadowed.len();
+                for name in &shadowed {
+                    subst.push((*name, MorTm::var(*name)));
+                }
+                let new_body = body.subst(subst);
+                subst.truncate(subst.len() - n);
+                MorTm::let_(bindings.clone(), new_bound, new_body)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -229,5 +286,29 @@ mod tests {
         assert!(tm.check(&ty).is_ok());
         let err = expect!["tensor term should have tensor type: ⊗ [x, y] vs X"];
         err.assert_eq(&tm.check(&Ty::sort("X")).unwrap_err());
+    }
+
+    #[test]
+    fn subst_mor() {
+        // Variables.
+        let mut subst = vec![(name("x"), MorTm::app("f", MorTm::var("a")))];
+        expect!["f a"].assert_eq(&MorTm::var("x").subst(&mut subst).to_string());
+        expect!["y"].assert_eq(&MorTm::var("y").subst(&mut subst).to_string());
+
+        // Lists, applications, etc.
+        let tm = MorTm::app("g", MorTm::list([MorTm::var("x"), MorTm::var("y")]));
+        expect!["g [f a, y]"].assert_eq(&tm.subst(&mut subst).to_string());
+
+        // Let bindings, with shadowing.
+        let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];
+        let tm = MorTm::let_(
+            ObTm::list([ObTm::var("x"), ObTm::var("z")]),
+            MorTm::list([MorTm::var("x"), MorTm::var("y")]),
+            MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
+        );
+        expect!["let [x, z] = [x, y] in [x, y, z]"].assert_eq(&tm.to_string());
+        expect!["let [x, z] = [a, b] in [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
+        // Stack is restored after substitution.
+        assert_eq!(subst.len(), 2);
     }
 }

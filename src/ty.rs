@@ -1,7 +1,7 @@
 //! Types for rule-based models.
 
 use derive_more::Display;
-use itertools::{Itertools, join};
+use itertools::join;
 
 use super::prelude::*;
 
@@ -88,6 +88,24 @@ impl Ty {
         Self::Tensor(Box::new(ty))
     }
 
+    /// Collects all the sorts that appear in the type.
+    pub fn collect_sorts(&self) -> Vec<Name> {
+        fn recurse(sorts: &mut Vec<Name>, ty: &Ty) {
+            match ty {
+                Ty::Sort(name) => sorts.push(*name),
+                Ty::List(types) => {
+                    for ty in types {
+                        recurse(sorts, ty);
+                    }
+                }
+                Ty::Tensor(ty) => recurse(sorts, ty),
+            }
+        }
+        let mut sorts = Vec::new();
+        recurse(&mut sorts, self);
+        sorts
+    }
+
     /// Checks whether the type is of the given kind.
     ///
     /// Returns an error when the type is not well-kinded.
@@ -124,6 +142,20 @@ impl Ty {
 mod tests {
     use super::*;
     use expect_test::expect;
+
+    #[test]
+    fn collect_sorts() {
+        // Sorts.
+        assert_eq!(Ty::sort("X").collect_sorts(), vec![name("X")]);
+
+        // Lists.
+        let ty = Ty::list([Ty::sort("X"), Ty::sort("Y"), Ty::sort("X")]);
+        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y"), name("X")]);
+
+        // Tensors.
+        let ty = Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]));
+        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y")]);
+    }
 
     #[test]
     fn synthesize() {
