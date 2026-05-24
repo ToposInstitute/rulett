@@ -1,6 +1,6 @@
 //! Rule-based models.
 
-use super::{prelude::*, theory::*};
+use super::{prelude::*, tm::*};
 
 /// A declaration in the definition of a rule-based model.
 pub enum ModelDecl {

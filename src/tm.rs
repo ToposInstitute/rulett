@@ -1,0 +1,43 @@
+use super::prelude::*;
+
+/// Object term.
+pub enum ObTm {
+    /// A variable.
+    ///
+    /// Example syntax: `x`
+    Var(Name),
+
+    /// A list of terms.
+    ///
+    /// Example syntax: `[x, y, z]`
+    List(Vec<ObTm>),
+}
+
+/// Morphism term.
+///
+/// A term in context, modulo alpha-equivalence, is a morphism in the theory.
+pub enum MorTm {
+    /// A variable.
+    ///
+    /// Example syntax: `x`
+    Var(Name),
+
+    /// A list of terms.
+    ///
+    /// Example syntax: `[x, y, z]`
+    List(Vec<MorTm>),
+
+    /// An application of an operation to a term.
+    ///
+    /// Example syntax: `f t`, `f [x, y]`
+    App(Name, Box<MorTm>),
+
+    /// A let binding.
+    ///
+    /// Example syntax: `let [x, y] = t in f [y, x]`
+    Let {
+        bindings: ObTm,
+        bound: Box<MorTm>,
+        body: Box<MorTm>,
+    },
+}

@@ -1,7 +1,7 @@
 //! Types for rule-based models.
 
 use derive_more::Display;
-use itertools::Itertools;
+use itertools::{Itertools, join};
 
 use super::prelude::*;
 
@@ -57,14 +57,18 @@ impl Kind {
 ///
 /// In double-categorical logic, types correspond to objects in a model of the
 /// double theory.
+#[derive(PartialEq, Eq, Display)]
 pub enum Ty {
     /// A primitive type, aka a sort, belonging to the signature.
+    #[display("{_0}")]
     Sort(Name),
 
     /// A list of types, each of which should have the same kind.
+    #[display("[{}]", join(_0, ", "))]
     List(Vec<Ty>),
 
     /// An application of the tensor (`⊗: List(Prim) -> Prim`) to a type.
+    #[display("⊗ {_0}")]
     Tensor(Box<Ty>),
 }
 
@@ -85,30 +89,31 @@ impl Ty {
     }
 
     /// Checks whether the type is of the given kind.
-    pub fn check(&self, kind: &Kind) -> bool {
-        self.synthesize().is_some_and(|k| k.unifies_with(kind))
+    ///
+    /// Returns an error when the type is not well-kinded.
+    pub fn check(&self, kind: &Kind) -> Result<bool, String> {
+        self.synthesize().map(|k| k.unifies_with(kind))
     }
 
     /// Synthesizes a kind for the type.
     ///
-    /// Returns something if the type is well-meta-typed up to holes; otherwise,
-    /// returns nothing.
-    pub fn synthesize(&self) -> Option<Kind> {
+    /// Returns an error when the type is not well-kinded.
+    pub fn synthesize(&self) -> Result<Kind, String> {
         match self {
-            Ty::Sort(_) => Some(Kind::prim()),
+            Ty::Sort(_) => Ok(Kind::prim()),
             Ty::List(types) => {
-                let kinds: Option<Vec<_>> = types.iter().map(|ty| ty.synthesize()).collect();
+                let kinds: Result<Vec<_>, _> = types.iter().map(|ty| ty.synthesize()).collect();
                 match kinds?.into_iter().all_equal_value() {
-                    Ok(kind) => Some(Kind::list(kind)),
-                    Err(None) => Some(Kind::list(Kind::hole())),
-                    Err(Some(_)) => None,
+                    Ok(kind) => Ok(Kind::list(kind)),
+                    Err(None) => Ok(Kind::list(Kind::hole())),
+                    Err(Some(_)) => Err(format!("mixed types in list: {self}")),
                 }
             }
             Ty::Tensor(ty) => {
-                if ty.check(&Kind::list(Kind::prim())) {
-                    Some(Kind::prim())
+                if ty.check(&Kind::list(Kind::prim()))? {
+                    Ok(Kind::prim())
                 } else {
-                    None
+                    Err(format!("tensor should be applied to list, received: {ty}"))
                 }
             }
         }
@@ -118,13 +123,13 @@ impl Ty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use expect_test::expect;
 
     #[test]
     fn synthesize() {
-        let syn = |ty: Ty| {
-            ty.synthesize()
-                .map(|kind| kind.to_string())
-                .unwrap_or_else(|| "ERROR".to_owned())
+        let syn = |ty: Ty| match ty.synthesize() {
+            Ok(kind) => kind.to_string(),
+            Err(msg) => format!("ERROR: {msg}"),
         };
 
         // Sorts.
@@ -134,18 +139,22 @@ mod tests {
         assert_eq!(syn(Ty::list([Ty::sort("X"), Ty::sort("Y")])), "List *");
         assert_eq!(syn(Ty::list([Ty::list([Ty::sort("X")])])), "List List *");
         assert_eq!(syn(Ty::list([])), "List ?");
-        assert_eq!(syn(Ty::list([Ty::sort("X"), Ty::list([])])), "ERROR");
+        let err = expect!["ERROR: mixed types in list: [X, []]"];
+        err.assert_eq(&syn(Ty::list([Ty::sort("X"), Ty::list([])])));
 
         // Tensors.
         assert_eq!(syn(Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]))), "*");
-        assert_eq!(syn(Ty::tensor(Ty::sort("X"))), "ERROR");
+        let err = expect!["ERROR: tensor should be applied to list, received: X"];
+        err.assert_eq(&syn(Ty::tensor(Ty::sort("X"))));
     }
 
     #[test]
     fn check() {
+        let chk = |ty: &Ty, kind: &Kind| ty.check(kind).unwrap();
+
         // Lists.
         let kind = Kind::list(Kind::prim());
-        assert!(Ty::list([Ty::sort("X")]).check(&kind));
-        assert!(Ty::list([]).check(&kind));
+        assert!(chk(&Ty::list([Ty::sort("X")]), &kind));
+        assert!(chk(&Ty::list([]), &kind));
     }
 }
