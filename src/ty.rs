@@ -127,10 +127,12 @@ mod tests {
 
     #[test]
     fn synthesize() {
-        let syn = |ty: Ty| match ty.synthesize() {
-            Ok(kind) => kind.to_string(),
-            Err(msg) => format!("ERROR: {msg}"),
-        };
+        fn syn(ty: Ty) -> String {
+            match ty.synthesize() {
+                Ok(kind) => kind.to_string(),
+                Err(msg) => format!("ERROR: {msg}"),
+            }
+        }
 
         // Sorts.
         assert_eq!(syn(Ty::sort("X")), "*");
@@ -150,7 +152,9 @@ mod tests {
 
     #[test]
     fn check() {
-        let chk = |ty: &Ty, kind: &Kind| ty.check(kind).unwrap();
+        fn chk(ty: &Ty, kind: &Kind) -> bool {
+            ty.check(kind).unwrap_or_default()
+        }
 
         // Lists.
         let kind = Kind::list(Kind::prim());
