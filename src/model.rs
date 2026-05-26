@@ -129,7 +129,6 @@ impl Model {
         (1..=max_agents)
             .flat_map(|n| {
                 agents_in_signature().combinations_with_replacement(n).flat_map(|agents| {
-                    println!("{:?}", agents);
                     self.species_from(&agents)
                         .into_iter()
                         .map(move |tm| PatternTm { agents: agents.clone(), tm })
@@ -150,10 +149,12 @@ impl Model {
                 component: i,
             }));
         }
-        println!("{:?}", interface);
-        let tm = MorTm::list(interface.iter().map(|var| MorTm::var(var.name)));
-        let components = Rc::new(QuickUnionUf::new(agents.len()));
-        let state = SpeciesState { tm, interface, components };
+        let state = SpeciesState {
+            tm: MorTm::list(interface.iter().map(|var| MorTm::var(var.name))),
+            interface,
+            components: Rc::new(QuickUnionUf::new(agents.len())),
+            min_match_idx: 0,
+        };
         // Run the search.
         let finder = SpeciesFinder::new(&self.signature);
         let mut results = Vec::new();
@@ -173,6 +174,7 @@ struct SpeciesState {
     tm: MorTm,
     interface: Vec<IntermediateVar>,
     components: Rc<QuickUnionUf<UnionBySize>>,
+    min_match_idx: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -180,16 +182,6 @@ struct IntermediateVar {
     name: Name,
     sort: Name,
     component: usize,
-}
-
-impl IntermediateVar {
-    fn replace_component(self, component: usize) -> Self {
-        Self {
-            name: self.name,
-            sort: self.sort,
-            component,
-        }
-    }
 }
 
 impl<'a> SpeciesFinder<'a> {
@@ -202,7 +194,12 @@ impl<'a> SpeciesFinder<'a> {
     }
 
     fn find(&self, state: SpeciesState, results: &mut Vec<MorTm>) {
-        let SpeciesState { interface, tm, components: uf } = state;
+        let SpeciesState {
+            interface,
+            tm,
+            components: uf,
+            min_match_idx,
+        } = state;
 
         // Success condition: found a closed term.
         if interface.is_empty() {
@@ -211,17 +208,23 @@ impl<'a> SpeciesFinder<'a> {
         }
 
         for idxs in (0..interface.len()).powerset() {
-            // Don't restrict along co-nullary operations as that causes
-            // infinite blow-up. Such operations, which include
+            // To avoid duplicate matches, skip any subsets that do not include
+            // at least one index beyond the minimum.
+            //
+            // In particular, never restrict along co-nullary operations as that
+            // causes infinite blow-up. Such operations, which include
             // [scalars](https://ncatlab.org/nlab/show/monoidal+category#scalars),
             // also seem pointless, but perhaps they're good for something?
-            if idxs.is_empty() {
+            let Some(&n) = idxs.iter().min() else {
+                continue;
+            };
+            if n < min_match_idx {
                 continue;
             }
+            let min_match_idx = n;
 
             // Get co-applicable operations, bailing early if there are none.
             let sorts = idxs.iter().map(|i| interface[*i].sort).collect_vec();
-            println!("{:?} {:?}", idxs, sorts);
             let Some(operations) = self.cod_index.get(&sorts).filter(|ops| !ops.is_empty()) else {
                 continue;
             };
@@ -242,15 +245,14 @@ impl<'a> SpeciesFinder<'a> {
             let interface_kept = interface
                 .iter()
                 .enumerate()
-                .filter_map(|(i, &var)| {
+                .filter_map(|(i, &(mut var))| {
                     if idxs.contains(&i) {
                         return None;
                     }
                     if has_merged {
-                        Some(var.replace_component(Rc::make_mut(&mut uf).find(var.component)))
-                    } else {
-                        Some(var)
+                        var.component = Rc::make_mut(&mut uf).find(var.component);
                     }
+                    Some(var)
                 })
                 .collect_vec();
 
@@ -258,7 +260,7 @@ impl<'a> SpeciesFinder<'a> {
             for op in operations {
                 let (dom, cod) = self.signature.interface(op).unwrap();
 
-                let interface_added = dom
+                let mut interface_added = dom
                     .collect_sorts()
                     .into_iter()
                     .map(|sort| {
@@ -269,8 +271,6 @@ impl<'a> SpeciesFinder<'a> {
                 let args = MorTm::list(interface_added.iter().map(|var| MorTm::var(var.name)));
                 let app = MorTm::app(*op, args);
 
-                println!("{op}: kept {:?}, added {:?}", interface_kept, interface_added);
-
                 let tm = if matches!(cod, Ty::Sort(_)) {
                     let i = idxs.iter().exactly_one().unwrap();
                     let var = interface[*i].name;
@@ -280,9 +280,15 @@ impl<'a> SpeciesFinder<'a> {
                     continue;
                 };
 
-                let mut interface = interface_added;
-                interface.extend(interface_kept.iter());
-                self.find(SpeciesState { tm, interface, components: uf.clone() }, results)
+                let mut interface = interface_kept.clone();
+                interface.append(&mut interface_added);
+                let state = SpeciesState {
+                    tm,
+                    interface,
+                    components: uf.clone(),
+                    min_match_idx,
+                };
+                self.find(state, results)
             }
         }
     }
@@ -334,7 +340,11 @@ mod tests {
     #[test]
     fn species() {
         let model = toy_model();
-        let expected = expect![[""]];
+        let expected = expect![[r#"
+            A [unphos [], empty []]
+            A [phos [], empty []]
+            B [empty []]
+            K []"#]];
         expected.assert_eq(&model.species(1).into_iter().join("\n"));
     }
 }
