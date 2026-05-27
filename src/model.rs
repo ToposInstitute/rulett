@@ -176,7 +176,7 @@ impl<'a> SpeciesFinder<'a> {
     }
 
     fn find(&self, interfaces: impl IntoIterator<Item = IndexMap<Name, Name>>) -> Vec<MorTm> {
-        // Initialize search state.
+        // Construct the total interface by concatenating given interfaces.
         let mut total_interface = Vec::new();
         let mut interfaces = interfaces.into_iter().enumerate();
         let mut n = 0;
@@ -192,12 +192,27 @@ impl<'a> SpeciesFinder<'a> {
             }
             // ...otherwise append to the total interface as a new component.
             total_interface.extend(interface.into_iter().map(|(name, sort)| IntermediateVar {
-                name: gensym(&name),
+                name,
                 sort,
                 component: i,
             }));
             n = i + 1;
         }
+
+        // Uniqueify names in total interface.
+        let mut counts = HashMap::new();
+        for var in &total_interface {
+            *counts.entry(var.name).or_insert(0) += 1;
+        }
+        counts.retain(|_, count| *count > 1);
+        for var in total_interface.iter_mut().rev() {
+            if let Some(count) = counts.get_mut(&var.name) {
+                var.name = name(format!("{}#{}", var.name, count));
+                *count -= 1;
+            }
+        }
+
+        // Initialize search state.
         let state = SpeciesState {
             tm: MorTm::list(total_interface.iter().map(|var| MorTm::var(var.name))),
             interface: total_interface,
@@ -374,13 +389,13 @@ mod tests {
             A [phos [], empty []]
             B [empty []]
             K []
-            A, A let ⊗ [##s#6, ##s#8] = bond [] in [unphos [], ##s#6, unphos [], ##s#8]
-            A, A let ⊗ [##s#6, ##s#8] = bond [] in [unphos [], ##s#6, phos [], ##s#8]
-            A, A let ⊗ [##s#6, ##s#8] = bond [] in [phos [], ##s#6, unphos [], ##s#8]
-            A, A let ⊗ [##s#6, ##s#8] = bond [] in [phos [], ##s#6, phos [], ##s#8]
-            A, B let ⊗ [##s#10, ##s#11] = bond [] in [unphos [], ##s#10, ##s#11]
-            A, B let ⊗ [##s#10, ##s#11] = bond [] in [phos [], ##s#10, ##s#11]
-            B, B let ⊗ [##s#14, ##s#15] = bond [] in [##s#14, ##s#15]"#]];
+            A, A let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, unphos [], s#2]
+            A, A let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, phos [], s#2]
+            A, A let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, unphos [], s#2]
+            A, A let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, phos [], s#2]
+            A, B let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, s#2]
+            A, B let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, s#2]
+            B, B let ⊗ [s#1, s#2] = bond [] in [s#1, s#2]"#]];
         expected.assert_eq(&model.species(2).into_iter().join("\n"));
     }
 }
