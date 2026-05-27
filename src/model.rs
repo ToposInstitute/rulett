@@ -5,21 +5,6 @@ use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
 use super::{gensym::*, prelude::*, theory::*, tm::*, ty::*};
 
-/// Pattern term in a rule-based model.
-///
-/// A pattern is represented as a restriction of a list of agents along a
-/// morphism term.
-pub struct PatternTm {
-    pub agents: Vec<Name>,
-    pub tm: MorTm,
-}
-
-impl fmt::Display for PatternTm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}", self.agents.iter().join(", "), self.tm)
-    }
-}
-
 /// Declaration in the definition of a rule-based model.
 pub enum ModelDecl {
     /// Declaration of an agent.
@@ -127,17 +112,12 @@ impl Model {
     pub fn species(&self, max_agents: usize) -> Vec<PatternTm> {
         let finder = SpeciesFinder::new(&self.signature);
         (1..=max_agents)
-            .flat_map(|n| {
-                let agents_in_signature = self.agents.keys().copied();
-                agents_in_signature.combinations_with_replacement(n).flat_map(|agents| {
-                    let agent_interfaces = agents
-                        .iter()
-                        .map(|agent| self.agents.get(agent).unwrap().collect_typed_vars());
-                    finder
-                        .find(agent_interfaces)
-                        .into_iter()
-                        .map(move |tm| PatternTm { agents: agents.clone(), tm })
-                })
+            .flat_map(|n| self.agents.keys().copied().combinations_with_replacement(n))
+            .flat_map(|agents| {
+                let agents_with_interfaces = agents
+                    .into_iter()
+                    .map(|agent| (agent, self.agents.get(&agent).unwrap().collect_typed_vars()));
+                finder.find(agents_with_interfaces)
             })
             .collect()
     }
@@ -151,7 +131,7 @@ struct SpeciesFinder<'a> {
 
 #[derive(Clone)]
 struct SpeciesState {
-    tm: MorTm,
+    tm: PatternTm,
     interface: Vec<IntermediateVar>,
     // Wrap the union find in `Rc` since we don't have to mutate it at each
     // branch point, only when restricting along an operation of co-arity >= 2.
@@ -175,46 +155,54 @@ impl<'a> SpeciesFinder<'a> {
         Self { signature, cod_index }
     }
 
-    fn find(&self, interfaces: impl IntoIterator<Item = IndexMap<Name, Name>>) -> Vec<MorTm> {
-        // Construct the total interface by concatenating given interfaces.
-        let mut total_interface = Vec::new();
+    fn find(
+        &self,
+        interfaces: impl IntoIterator<Item = (Name, IndexMap<Name, Name>)>,
+    ) -> Vec<PatternTm> {
+        // Collect all variables, then ensure they are unique.
+        let mut agents: Vec<(Name, Vec<Name>)> = Vec::new();
+        let mut variables = Vec::new();
         let mut interfaces = interfaces.into_iter().enumerate();
-        let mut n = 0;
-        while let Some((i, interface)) = interfaces.next() {
-            // If any agent's interface is empty, exit early since any
-            // non-trivial product with the agent is decomposable...
+        while let Some((i, (agent, interface))) = interfaces.next() {
+            // Degenerate case: if any agent's interface is empty, exit early
+            // since any non-trivial product with the agent is decomposable.
             if interface.is_empty() {
                 return if i == 0 && interfaces.next().is_none() {
-                    vec![MorTm::list([])]
+                    vec![PatternTm::restrict(agent, MorTm::list([]))]
                 } else {
                     vec![]
                 };
             }
-            // ...otherwise append to the total interface as a new component.
-            total_interface.extend(interface.into_iter().map(|(name, sort)| IntermediateVar {
-                name,
-                sort,
-                component: i,
-            }));
-            n = i + 1;
-        }
 
-        // Uniqueify names in total interface.
-        let mut counts = HashMap::new();
-        for var in &total_interface {
-            *counts.entry(var.name).or_insert(0) += 1;
+            let (vars, sorts): (Vec<_>, Vec<_>) = interface.into_iter().unzip();
+            agents.push((agent, sorts));
+            variables.extend(vars);
         }
-        counts.retain(|_, count| *count > 1);
-        for var in total_interface.iter_mut().rev() {
-            if let Some(count) = counts.get_mut(&var.name) {
-                var.name = name(format!("{}#{}", var.name, count));
-                *count -= 1;
+        uniqueify_names(&mut variables);
+
+        // Build initial term.
+        let mut terms = Vec::new();
+        let mut total_interface = Vec::new();
+        let mut variables = variables.into_iter();
+        for (i, (agent, sorts)) in agents.into_iter().enumerate() {
+            let mut vars = Vec::new();
+            for sort in sorts {
+                let var = variables.next().unwrap();
+                total_interface.push(IntermediateVar { name: var, sort, component: i });
+                vars.push(MorTm::var(var));
             }
+            terms.push(PatternTm::restrict(agent, MorTm::list(vars)));
         }
+        let n = terms.len();
+        let tm = if n == 1 {
+            terms.remove(0)
+        } else {
+            PatternTm::tensor(PatternTm::list(terms))
+        };
 
         // Initialize search state.
         let state = SpeciesState {
-            tm: MorTm::list(total_interface.iter().map(|var| MorTm::var(var.name))),
+            tm,
             interface: total_interface,
             uf: Rc::new(QuickUnionUf::new(n)),
             min_match_idx: 0,
@@ -226,7 +214,7 @@ impl<'a> SpeciesFinder<'a> {
         results
     }
 
-    fn recurse(&self, state: SpeciesState, results: &mut Vec<MorTm>) {
+    fn recurse(&self, state: SpeciesState, results: &mut Vec<PatternTm>) {
         let SpeciesState { interface, tm, uf, min_match_idx } = state;
 
         // Success condition: found a closed term.
@@ -321,7 +309,7 @@ impl<'a> SpeciesFinder<'a> {
                     // Other co-arity: introduce a let binding.
                     let vars = idxs.iter().map(|i| ObTm::var(interface[*i].name));
                     let bindings = ObTm::tensor(ObTm::list(vars));
-                    MorTm::let_(bindings, app, tm.clone())
+                    PatternTm::let_(bindings, app, tm.clone())
                 };
 
                 let mut interface = interface_kept.clone();
@@ -340,6 +328,21 @@ impl<'a> SpeciesFinder<'a> {
 
 fn gen_var_with_sort(sort: &Name) -> Name {
     gensym(&sort.to_lowercase())
+}
+
+fn uniqueify_names(names: &mut Vec<Name>) {
+    let mut counts = HashMap::new();
+    for name in names.iter().copied() {
+        *counts.entry(name).or_insert(0) += 1;
+    }
+    counts.retain(|_, count| *count > 1);
+
+    for name in names.iter_mut().rev() {
+        if let Some(count) = counts.get_mut(name) {
+            *name = format!("{}#{}", name, count).into();
+            *count -= 1;
+        }
+    }
 }
 
 /// Our favorite toy example of a ruled-based model.
@@ -389,13 +392,13 @@ mod tests {
             A [phos [], empty []]
             B [empty []]
             K []
-            A, A let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, unphos [], s#2]
-            A, A let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, phos [], s#2]
-            A, A let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, unphos [], s#2]
-            A, A let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, phos [], s#2]
-            A, B let ⊗ [s#1, s#2] = bond [] in [unphos [], s#1, s#2]
-            A, B let ⊗ [s#1, s#2] = bond [] in [phos [], s#1, s#2]
-            B, B let ⊗ [s#1, s#2] = bond [] in [s#1, s#2]"#]];
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], A [unphos [], s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], A [phos [], s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], A [unphos [], s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], A [phos [], s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], B [s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], B [s#2]]
+            let ⊗ [s#1, s#2] = bond [] in ⊗ [B [s#1], B [s#2]]"#]];
         expected.assert_eq(&model.species(2).into_iter().join("\n"));
     }
 }

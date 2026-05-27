@@ -5,8 +5,8 @@ use super::{prelude::*, ty::*};
 
 /// Object term.
 ///
-/// To be more precise, this is an object term without its type. The judgment
-/// that an object term has a type is represented by [`ObTmJudgment`].
+/// More precisely, this is an object term sans type. The judgment that an
+/// object term has a type is represented by [`ObTmJudgment`].
 #[derive(Clone, PartialEq, Eq, Display)]
 pub enum ObTm {
     /// A variable.
@@ -173,7 +173,7 @@ pub enum MorTm {
     #[display("[{}]", join(_0, ", "))]
     List(Vec<MorTm>),
 
-    /// An application of the tensor to a term.
+    /// An application of the tensor product to a term.
     ///
     /// Example syntax: `⊗ [t, s]`
     #[display("⊗ {_0}")]
@@ -181,7 +181,7 @@ pub enum MorTm {
 
     /// An application of an operation in the signature to a term.
     ///
-    /// Example syntax: `f t`, `f [x, y]`
+    /// Example syntax: `f t`, where `t = [x, y]`
     #[display("{_0} {_1}")]
     App(Name, Box<MorTm>),
 
@@ -228,9 +228,7 @@ impl MorTm {
 
     /// Simultaneously substitutes terms for free variables in the term.
     ///
-    /// Substitution is not capture-avoiding: callers must ensure that
-    /// substituted terms do not contain free variables clashing with let-bound
-    /// names along the path of substitution.
+    /// Warning: substitution is not capture-avoiding.
     pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> MorTm {
         match self {
             MorTm::Var(name) => subst
@@ -251,6 +249,87 @@ impl MorTm {
                 let new_body = body.subst(subst);
                 subst.truncate(subst.len() - n);
                 MorTm::let_(bindings.clone(), new_bound, new_body)
+            }
+        }
+    }
+}
+
+/// Pattern term in a rule-based model.
+#[derive(Clone, PartialEq, Eq, Display)]
+pub enum PatternTm {
+    /// A restriction of an agent along a morphism.
+    ///
+    /// Example syntax: `A t`, where `t = [x, y]`
+    #[display("{_0} {_1}")]
+    Restrict(Name, MorTm),
+
+    /// A list of patterns.
+    ///
+    /// Example syntax: `[A [x], B [y]]`
+    #[display("[{}]", join(_0, ", "))]
+    List(Vec<PatternTm>),
+
+    /// An application of the tensor product to a pattern.
+    ///
+    /// Example syntax: `⊗ [A [x], B [y]]`
+    #[display("⊗ {_0}")]
+    Tensor(Box<PatternTm>),
+
+    /// A let binding.
+    ///
+    /// Example syntax: `let ⊗ [x, y] = t in A [y, x]`
+    ///
+    /// Strictly speaking, let bindings don't belong in pattern terms---they can
+    /// always be pushed into morphism terms, where they do belong---but we
+    /// allow them here because (1) they're convenient in the species search
+    /// algorithm and (2) they make for nicer pretty printing.
+    #[display("let {bindings} = {bound} in {body}")]
+    Let {
+        bindings: ObTm,
+        bound: MorTm,
+        body: Box<PatternTm>,
+    },
+}
+
+impl PatternTm {
+    /// Smart constructor for [`Restriction`](Self::Restriction) variant.
+    pub fn restrict(name: impl Into<Name>, tm: MorTm) -> Self {
+        Self::Restrict(name.into(), tm)
+    }
+
+    /// Smart constructor for [`List`](Self::List) variant.
+    pub fn list(patterns: impl IntoIterator<Item = PatternTm>) -> Self {
+        Self::List(patterns.into_iter().collect())
+    }
+
+    /// Smart constructor for [`Tensor`](Self::Tensor) variant.
+    pub fn tensor(pattern: PatternTm) -> Self {
+        Self::Tensor(Box::new(pattern))
+    }
+
+    /// Smart constructor for [`Let`](Self::Let) variant.
+    pub fn let_(bindings: ObTm, bound: MorTm, body: PatternTm) -> Self {
+        Self::Let { bindings, bound, body: Box::new(body) }
+    }
+
+    /// Simultaneously substitutes terms for free variables in the pattern.
+    ///
+    /// Warning: Substitution is not capture-avoiding.
+    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> PatternTm {
+        match self {
+            PatternTm::Restrict(name, tm) => PatternTm::restrict(*name, tm.subst(subst)),
+            PatternTm::List(patterns) => PatternTm::list(patterns.iter().map(|p| p.subst(subst))),
+            PatternTm::Tensor(pattern) => PatternTm::tensor(pattern.subst(subst)),
+            PatternTm::Let { bindings, bound, body } => {
+                let new_bound = bound.subst(subst);
+                let shadowed = bindings.collect_vars().unwrap_or_default();
+                let n = shadowed.len();
+                for name in &shadowed {
+                    subst.push((*name, MorTm::var(*name)));
+                }
+                let new_body = body.subst(subst);
+                subst.truncate(subst.len() - n);
+                PatternTm::let_(bindings.clone(), new_bound, new_body)
             }
         }
     }
@@ -308,6 +387,33 @@ mod tests {
         );
         expect!["let [x, z] = [x, y] in [x, y, z]"].assert_eq(&tm.to_string());
         expect!["let [x, z] = [a, b] in [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
+        // Stack is restored after substitution.
+        assert_eq!(subst.len(), 2);
+    }
+
+    #[test]
+    fn subst_pattern() {
+        // Basic substitution.
+        let mut subst = vec![(name("x"), MorTm::app("f", MorTm::var("a")))];
+        let tm = PatternTm::tensor(PatternTm::list([
+            PatternTm::restrict("A", MorTm::list([MorTm::var("x")])),
+            PatternTm::restrict("B", MorTm::list([MorTm::var("y")])),
+        ]));
+        expect!["⊗ [A [x], B [y]]"].assert_eq(&tm.to_string());
+        expect!["⊗ [A [f a], B [y]]"].assert_eq(&tm.subst(&mut subst).to_string());
+
+        // Let bindings, with shadowing.
+        let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];
+        let tm = PatternTm::let_(
+            ObTm::list([ObTm::var("x"), ObTm::var("z")]),
+            MorTm::list([MorTm::var("x"), MorTm::var("y")]),
+            PatternTm::restrict(
+                "A",
+                MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
+            ),
+        );
+        expect!["let [x, z] = [x, y] in A [x, y, z]"].assert_eq(&tm.to_string());
+        expect!["let [x, z] = [a, b] in A [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
         // Stack is restored after substitution.
         assert_eq!(subst.len(), 2);
     }
