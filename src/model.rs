@@ -155,7 +155,7 @@ struct SpeciesState {
     interface: Vec<IntermediateVar>,
     // Wrap the union find in `Rc` since we don't have to mutate it at each
     // branch point, only when restricting along an operation of co-arity >= 2.
-    components: Rc<QuickUnionUf<UnionBySize>>,
+    uf: Rc<QuickUnionUf<UnionBySize>>,
     min_match_idx: usize,
 }
 
@@ -181,8 +181,8 @@ impl<'a> SpeciesFinder<'a> {
         let mut interfaces = interfaces.into_iter().enumerate();
         let mut n = 0;
         while let Some((i, interface)) = interfaces.next() {
-            // Degenerate case: if any agent's interface is empty, exit early
-            // since any non-trivial product with the agent is decomposable.
+            // If any agent's interface is empty, exit early since any
+            // non-trivial product with the agent is decomposable...
             if interface.is_empty() {
                 return if i == 0 && interfaces.next().is_none() {
                     vec![MorTm::list([])]
@@ -190,9 +190,9 @@ impl<'a> SpeciesFinder<'a> {
                     vec![]
                 };
             }
-
+            // ...otherwise append to the total interface as a new component.
             total_interface.extend(interface.into_iter().map(|(name, sort)| IntermediateVar {
-                name,
+                name: gensym(&name),
                 sort,
                 component: i,
             }));
@@ -201,7 +201,7 @@ impl<'a> SpeciesFinder<'a> {
         let state = SpeciesState {
             tm: MorTm::list(total_interface.iter().map(|var| MorTm::var(var.name))),
             interface: total_interface,
-            components: Rc::new(QuickUnionUf::new(n)),
+            uf: Rc::new(QuickUnionUf::new(n)),
             min_match_idx: 0,
         };
 
@@ -212,12 +212,7 @@ impl<'a> SpeciesFinder<'a> {
     }
 
     fn recurse(&self, state: SpeciesState, results: &mut Vec<MorTm>) {
-        let SpeciesState {
-            interface,
-            tm,
-            components: uf,
-            min_match_idx,
-        } = state;
+        let SpeciesState { interface, tm, uf, min_match_idx } = state;
 
         // Success condition: found a closed term.
         if interface.is_empty() {
@@ -303,12 +298,15 @@ impl<'a> SpeciesFinder<'a> {
                 let args = MorTm::list(interface_added.iter().map(|var| MorTm::var(var.name)));
                 let app = MorTm::app(*op, args);
                 let tm = if matches!(cod, Ty::Sort(_)) {
+                    // Co-unary case: substitute along a single variable.
                     let i = idxs.iter().exactly_one().unwrap();
                     let var = interface[*i].name;
                     tm.subst(&mut vec![(var, app)])
                 } else {
-                    // TODO: Let binding.
-                    continue;
+                    // Other co-arity: introduce a let binding.
+                    let vars = idxs.iter().map(|i| ObTm::var(interface[*i].name));
+                    let bindings = ObTm::tensor(ObTm::list(vars));
+                    MorTm::let_(bindings, app, tm.clone())
                 };
 
                 let mut interface = interface_kept.clone();
@@ -316,7 +314,7 @@ impl<'a> SpeciesFinder<'a> {
                 let state = SpeciesState {
                     tm,
                     interface,
-                    components: uf.clone(),
+                    uf: uf.clone(),
                     min_match_idx,
                 };
                 self.recurse(state, results)
@@ -375,7 +373,14 @@ mod tests {
             A [unphos [], empty []]
             A [phos [], empty []]
             B [empty []]
-            K []"#]];
+            K []
+            A, A let ⊗ [##s#6, ##s#8] = bond [] in [unphos [], ##s#6, unphos [], ##s#8]
+            A, A let ⊗ [##s#6, ##s#8] = bond [] in [unphos [], ##s#6, phos [], ##s#8]
+            A, A let ⊗ [##s#6, ##s#8] = bond [] in [phos [], ##s#6, unphos [], ##s#8]
+            A, A let ⊗ [##s#6, ##s#8] = bond [] in [phos [], ##s#6, phos [], ##s#8]
+            A, B let ⊗ [##s#10, ##s#11] = bond [] in [unphos [], ##s#10, ##s#11]
+            A, B let ⊗ [##s#10, ##s#11] = bond [] in [phos [], ##s#10, ##s#11]
+            B, B let ⊗ [##s#14, ##s#15] = bond [] in [##s#14, ##s#15]"#]];
         expected.assert_eq(&model.species(2).into_iter().join("\n"));
     }
 }
