@@ -1,7 +1,6 @@
 //! Types for rule-based models.
 
 use derive_more::Display;
-use itertools::join;
 
 use super::prelude::*;
 
@@ -64,7 +63,7 @@ pub enum Ty {
     Sort(Name),
 
     /// A list of types, each of which should have the same kind.
-    #[display("[{}]", join(_0, ", "))]
+    #[display("[{}]", _0.iter().join(", "))]
     List(Vec<Ty>),
 
     /// An application of the tensor (`⊗: List(Prim) -> Prim`) to a type.

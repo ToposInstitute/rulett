@@ -1,7 +1,5 @@
 use std::fmt;
 
-use itertools::join;
-
 use super::{prelude::*, ty::*};
 
 /// Object term.
@@ -30,9 +28,9 @@ impl fmt::Display for ObTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ObTm::Var(name) => write!(f, "{name}"),
-            ObTm::List(terms) => write!(f, "[{}]", join(terms, ", ")),
+            ObTm::List(terms) => write!(f, "[{}]", terms.iter().join(", ")),
             ObTm::Tensor(tm) => match &**tm {
-                ObTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                ObTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
                 _ => write!(f, "⊗ {tm}"),
             },
         }
@@ -206,9 +204,9 @@ impl fmt::Display for MorTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MorTm::Var(name) => write!(f, "{name}"),
-            MorTm::List(terms) => write!(f, "[{}]", join(terms, ", ")),
+            MorTm::List(terms) => write!(f, "[{}]", terms.iter().join(", ")),
             MorTm::Tensor(tm) => match &**tm {
-                MorTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                MorTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
                 _ => write!(f, "⊗ {tm}"),
             },
             MorTm::App(name, tm) => write!(f, "{name} {tm}"),
@@ -314,9 +312,9 @@ impl fmt::Display for PatternTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PatternTm::Restrict(name, tm) => write!(f, "{name} {tm}"),
-            PatternTm::List(patterns) => write!(f, "[{}]", join(patterns, ", ")),
+            PatternTm::List(patterns) => write!(f, "[{}]", patterns.iter().join(", ")),
             PatternTm::Tensor(tm) => match &**tm {
-                PatternTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                PatternTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
                 _ => write!(f, "⊗ {tm}"),
             },
             PatternTm::Let { bindings, bound, body } => {

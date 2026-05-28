@@ -3,7 +3,7 @@
 use std::{fmt, rc::Rc};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
-use super::{gensym::*, prelude::*, theory::*, tm::*, ty::*};
+use super::{prelude::*, theory::*, tm::*, ty::*};
 
 /// Declaration in the definition of a rule-based model.
 pub enum ModelDecl {
@@ -178,17 +178,17 @@ impl<'a> SpeciesFinder<'a> {
             agents.push((agent, sorts));
             variables.extend(vars);
         }
-        uniqueify_names(&mut variables);
+        uniquify_names(&mut variables);
 
         // Build initial term.
         let mut terms = Vec::new();
-        let mut total_interface = Vec::new();
+        let mut interface = Vec::new();
         let mut variables = variables.into_iter();
         for (i, (agent, sorts)) in agents.into_iter().enumerate() {
             let mut vars = Vec::new();
             for sort in sorts {
                 let var = variables.next().unwrap();
-                total_interface.push(IntermediateVar { name: var, sort, component: i });
+                interface.push(IntermediateVar { name: var, sort, component: i });
                 vars.push(MorTm::var(var));
             }
             terms.push(PatternTm::restrict(agent, MorTm::list(vars)));
@@ -200,15 +200,9 @@ impl<'a> SpeciesFinder<'a> {
             PatternTm::tensor(PatternTm::list(terms))
         };
 
-        // Initialize search state.
-        let state = SpeciesState {
-            tm,
-            interface: total_interface,
-            uf: Rc::new(QuickUnionUf::new(n)),
-            min_match_idx: 0,
-        };
-
-        // Run the search.
+        // Initialize the search state, then run the search.
+        let uf = Rc::new(QuickUnionUf::new(n));
+        let state = SpeciesState { tm, interface, uf, min_match_idx: 0 };
         let mut results = Vec::new();
         self.recurse(state, &mut results);
         results
@@ -328,21 +322,6 @@ impl<'a> SpeciesFinder<'a> {
 
 fn gen_var_with_sort(sort: &Name) -> Name {
     gensym(&sort.to_lowercase())
-}
-
-fn uniqueify_names(names: &mut [Name]) {
-    let mut counts = HashMap::new();
-    for name in names.iter().copied() {
-        *counts.entry(name).or_insert(0) += 1;
-    }
-    counts.retain(|_, count| *count > 1);
-
-    for name in names.iter_mut().rev() {
-        if let Some(count) = counts.get_mut(name) {
-            *name = format!("{}#{}", name, count).into();
-            *count -= 1;
-        }
-    }
 }
 
 /// Our favorite toy example of a ruled-based model.
