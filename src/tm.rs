@@ -1,4 +1,5 @@
-use derive_more::Display;
+use std::fmt;
+
 use itertools::join;
 
 use super::{prelude::*, ty::*};
@@ -7,25 +8,35 @@ use super::{prelude::*, ty::*};
 ///
 /// More precisely, this is an object term sans type. The judgment that an
 /// object term has a type is represented by [`ObTmJudgment`].
-#[derive(Clone, PartialEq, Eq, Display)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ObTm {
     /// A variable.
     ///
     /// Example syntax: `x`
-    #[display("{_0}")]
     Var(Name),
 
     /// A list of terms.
     ///
     /// Example syntax: `[x, y, z]`
-    #[display("[{}]", join(_0, ", "))]
     List(Vec<ObTm>),
 
     /// An application of the tensor to a term.
     ///
     /// Example syntax: `⊗ [t, s]`
-    #[display("⊗ {_0}")]
     Tensor(Box<ObTm>),
+}
+
+impl fmt::Display for ObTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ObTm::Var(name) => write!(f, "{name}"),
+            ObTm::List(terms) => write!(f, "[{}]", join(terms, ", ")),
+            ObTm::Tensor(tm) => match &**tm {
+                ObTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                _ => write!(f, "⊗ {tm}"),
+            },
+        }
+    }
 }
 
 impl ObTm {
@@ -159,41 +170,53 @@ impl ObTmJudgment {
 }
 
 /// Morphism term (sans domain term and codomain type).
-#[derive(Clone, PartialEq, Eq, Display)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum MorTm {
     /// A variable.
     ///
     /// Example syntax: `x`
-    #[display("{_0}")]
     Var(Name),
 
     /// A list of terms.
     ///
     /// Example syntax: `[x, y, z]`
-    #[display("[{}]", join(_0, ", "))]
     List(Vec<MorTm>),
 
     /// An application of the tensor product to a term.
     ///
     /// Example syntax: `⊗ [t, s]`
-    #[display("⊗ {_0}")]
     Tensor(Box<MorTm>),
 
     /// An application of an operation in the signature to a term.
     ///
     /// Example syntax: `f t`, where `t = [x, y]`
-    #[display("{_0} {_1}")]
     App(Name, Box<MorTm>),
 
     /// A let binding.
     ///
     /// Example syntax: `let ⊗ [x, y] = t in f [y, x]`
-    #[display("let {bindings} = {bound} in {body}")]
     Let {
         bindings: ObTm,
         bound: Box<MorTm>,
         body: Box<MorTm>,
     },
+}
+
+impl fmt::Display for MorTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MorTm::Var(name) => write!(f, "{name}"),
+            MorTm::List(terms) => write!(f, "[{}]", join(terms, ", ")),
+            MorTm::Tensor(tm) => match &**tm {
+                MorTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                _ => write!(f, "⊗ {tm}"),
+            },
+            MorTm::App(name, tm) => write!(f, "{name} {tm}"),
+            MorTm::Let { bindings, bound, body } => {
+                write!(f, "let {bindings} = {bound} in {body}")
+            }
+        }
+    }
 }
 
 impl MorTm {
@@ -255,24 +278,21 @@ impl MorTm {
 }
 
 /// Pattern term in a rule-based model.
-#[derive(Clone, PartialEq, Eq, Display)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum PatternTm {
     /// A restriction of an agent along a morphism.
     ///
     /// Example syntax: `A t`, where `t = [x, y]`
-    #[display("{_0} {_1}")]
     Restrict(Name, MorTm),
 
     /// A list of patterns.
     ///
     /// Example syntax: `[A [x], B [y]]`
-    #[display("[{}]", join(_0, ", "))]
     List(Vec<PatternTm>),
 
     /// An application of the tensor product to a pattern.
     ///
     /// Example syntax: `⊗ [A [x], B [y]]`
-    #[display("⊗ {_0}")]
     Tensor(Box<PatternTm>),
 
     /// A let binding.
@@ -283,12 +303,27 @@ pub enum PatternTm {
     /// always be pushed into morphism terms, where they do belong---but we
     /// allow them here because (1) they're convenient in the species search
     /// algorithm and (2) they make for nicer pretty printing.
-    #[display("let {bindings} = {bound} in {body}")]
     Let {
         bindings: ObTm,
         bound: MorTm,
         body: Box<PatternTm>,
     },
+}
+
+impl fmt::Display for PatternTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PatternTm::Restrict(name, tm) => write!(f, "{name} {tm}"),
+            PatternTm::List(patterns) => write!(f, "[{}]", join(patterns, ", ")),
+            PatternTm::Tensor(tm) => match &**tm {
+                PatternTm::List(terms) => write!(f, "({})", join(terms, ", ")),
+                _ => write!(f, "⊗ {tm}"),
+            },
+            PatternTm::Let { bindings, bound, body } => {
+                write!(f, "let {bindings} = {bound} in {body}")
+            }
+        }
+    }
 }
 
 impl PatternTm {
@@ -363,7 +398,7 @@ mod tests {
         let tm = ObTm::tensor(ObTm::list([ObTm::var("x"), ObTm::var("y")]));
         let ty = Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]));
         assert!(tm.check(&ty).is_ok());
-        let err = expect!["tensor term should have tensor type: ⊗ [x, y] vs X"];
+        let err = expect!["tensor term should have tensor type: (x, y) vs X"];
         err.assert_eq(&tm.check(&Ty::sort("X")).unwrap_err());
     }
 
@@ -399,8 +434,8 @@ mod tests {
             PatternTm::restrict("A", MorTm::list([MorTm::var("x")])),
             PatternTm::restrict("B", MorTm::list([MorTm::var("y")])),
         ]));
-        expect!["⊗ [A [x], B [y]]"].assert_eq(&tm.to_string());
-        expect!["⊗ [A [f a], B [y]]"].assert_eq(&tm.subst(&mut subst).to_string());
+        expect!["(A [x], B [y])"].assert_eq(&tm.to_string());
+        expect!["(A [f a], B [y])"].assert_eq(&tm.subst(&mut subst).to_string());
 
         // Let bindings, with shadowing.
         let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];

@@ -330,7 +330,7 @@ fn gen_var_with_sort(sort: &Name) -> Name {
     gensym(&sort.to_lowercase())
 }
 
-fn uniqueify_names(names: &mut Vec<Name>) {
+fn uniqueify_names(names: &mut [Name]) {
     let mut counts = HashMap::new();
     for name in names.iter().copied() {
         *counts.entry(name).or_insert(0) += 1;
@@ -392,13 +392,13 @@ mod tests {
             A [phos [], empty []]
             B [empty []]
             K []
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], A [unphos [], s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], A [phos [], s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], A [unphos [], s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], A [phos [], s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [unphos [], s#1], B [s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [A [phos [], s#1], B [s#2]]
-            let ⊗ [s#1, s#2] = bond [] in ⊗ [B [s#1], B [s#2]]"#]];
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], A [unphos [], s#2])
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], A [phos [], s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], A [unphos [], s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], A [phos [], s#2])
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (B [s#1], B [s#2])"#]];
         expected.assert_eq(&model.species(2).into_iter().join("\n"));
     }
 }
