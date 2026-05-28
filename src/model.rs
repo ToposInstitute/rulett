@@ -324,9 +324,9 @@ fn gen_var_with_sort(sort: &Name) -> Name {
     gensym(&sort.to_lowercase())
 }
 
-/// Our favorite toy example of a ruled-based model.
+/// A toy example of a ruled-based model (variant 1).
 #[cfg(test)]
-pub(crate) fn toy_model() -> Model {
+pub(crate) fn toy_model_v1() -> Model {
     let decls = [
         ModelDecl::agent(
             "A",
@@ -336,7 +336,22 @@ pub(crate) fn toy_model() -> Model {
         ModelDecl::agent("B", ObTm::list([ObTm::var("s")]), Ty::list([Ty::sort("Site")])),
         ModelDecl::agent("K", ObTm::list([]), Ty::list([])),
     ];
-    Model::parse(toy_signature(), decls).unwrap()
+    Model::parse(toy_signature_v1(), decls).unwrap()
+}
+
+/// A toy example of a ruled-based model (variant 2).
+#[cfg(test)]
+pub(crate) fn toy_model_v2() -> Model {
+    let decls = [
+        ModelDecl::agent(
+            "A",
+            ObTm::list([ObTm::var("r"), ObTm::var("s")]),
+            Ty::list([Ty::sort("Res"), Ty::sort("SiteA")]),
+        ),
+        ModelDecl::agent("B", ObTm::list([ObTm::var("s")]), Ty::list([Ty::sort("SiteB")])),
+        ModelDecl::agent("K", ObTm::list([]), Ty::list([])),
+    ];
+    Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
 #[cfg(test)]
@@ -360,12 +375,30 @@ mod tests {
             [s] : [Site] ⊢ B [s]
             [] : [] ⊢ K []
         "#]];
-        expected.assert_eq(&toy_model().to_string());
+        expected.assert_eq(&toy_model_v1().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Res
+            SiteA
+            SiteB
+            #/ operations:
+            unphos : [] → Res
+            phos : [] → Res
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            #/ agents:
+            [r, s] : [Res, SiteA] ⊢ A [r, s]
+            [s] : [SiteB] ⊢ B [s]
+            [] : [] ⊢ K []
+        "#]];
+        expected.assert_eq(&toy_model_v2().to_string());
     }
 
     #[test]
     fn species() {
-        let model = toy_model();
+        let model = toy_model_v1();
         let expected = expect![[r#"
             A [unphos [], empty []]
             A [phos [], empty []]
@@ -378,6 +411,16 @@ mod tests {
             let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
             let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])
             let (s#1, s#2) = bond [] in (B [s#1], B [s#2])"#]];
+        expected.assert_eq(&model.species(2).into_iter().join("\n"));
+
+        let model = toy_model_v2();
+        let expected = expect![[r#"
+            A [unphos [], emptyA []]
+            A [phos [], emptyA []]
+            B [emptyB []]
+            K []
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])"#]];
         expected.assert_eq(&model.species(2).into_iter().join("\n"));
     }
 }

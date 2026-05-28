@@ -161,9 +161,9 @@ impl fmt::Display for Signature {
     }
 }
 
-/// Signature for a toy model.
+/// Signature for a toy model (variant 1).
 #[cfg(test)]
-pub(crate) fn toy_signature() -> Signature {
+pub(crate) fn toy_signature_v1() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Res"),
         SignatureDecl::operation("unphos", Ty::list([]), Ty::sort("Res")),
@@ -174,6 +174,26 @@ pub(crate) fn toy_signature() -> Signature {
             "bond",
             Ty::list([]),
             Ty::tensor(Ty::list([Ty::sort("Site"), Ty::sort("Site")])),
+        ),
+    ])
+    .unwrap()
+}
+
+/// Signature for a toy model (variant 2).
+#[cfg(test)]
+pub(crate) fn toy_signature_v2() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("Res"),
+        SignatureDecl::operation("unphos", Ty::list([]), Ty::sort("Res")),
+        SignatureDecl::operation("phos", Ty::list([]), Ty::sort("Res")),
+        SignatureDecl::sort("SiteA"),
+        SignatureDecl::sort("SiteB"),
+        SignatureDecl::operation("emptyA", Ty::list([]), Ty::sort("SiteA")),
+        SignatureDecl::operation("emptyB", Ty::list([]), Ty::sort("SiteB")),
+        SignatureDecl::operation(
+            "bond",
+            Ty::list([]),
+            Ty::tensor(Ty::list([Ty::sort("SiteA"), Ty::sort("SiteB")])),
         ),
     ])
     .unwrap()
@@ -196,6 +216,20 @@ mod tests {
             empty : [] → Site
             bond : [] → ⊗ [Site, Site]
         "#]];
-        expected.assert_eq(&toy_signature().to_string());
+        expected.assert_eq(&toy_signature_v1().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Res
+            SiteA
+            SiteB
+            #/ operations:
+            unphos : [] → Res
+            phos : [] → Res
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+        "#]];
+        expected.assert_eq(&toy_signature_v2().to_string());
     }
 }
