@@ -168,7 +168,7 @@ impl<'a> SpeciesFinder<'a> {
             // since any non-trivial product with the agent is decomposable.
             if interface.is_empty() {
                 return if i == 0 && interfaces.next().is_none() {
-                    vec![PatternTm::restrict(agent, MorTm::list([]))]
+                    vec![PatternTm::res(agent, MorTm::list([]))]
                 } else {
                     vec![]
                 };
@@ -191,7 +191,7 @@ impl<'a> SpeciesFinder<'a> {
                 interface.push(IntermediateVar { name: var, sort, component: i });
                 vars.push(MorTm::var(var));
             }
-            terms.push(PatternTm::restrict(agent, MorTm::list(vars)));
+            terms.push(PatternTm::res(agent, MorTm::list(vars)));
         }
         let n = terms.len();
         let tm = if n == 1 {
@@ -292,24 +292,21 @@ impl<'a> SpeciesFinder<'a> {
                     continue;
                 }
 
-                let args = MorTm::list(interface_added.iter().map(|var| MorTm::var(var.name)));
-                let app = MorTm::app(*op, args);
-                let tm = if matches!(cod, Ty::Sort(_)) {
-                    // Co-unary case: substitute along a single variable.
+                let restrict_at = if matches!(cod, Ty::Sort(_)) {
                     let i = idxs.iter().exactly_one().unwrap();
-                    let var = interface[*i].name;
-                    tm.subst(&mut vec![(var, app)])
+                    ObTm::var(interface[*i].name)
                 } else {
-                    // Other co-arity: introduce a let binding.
                     let vars = idxs.iter().map(|i| ObTm::var(interface[*i].name));
-                    let bindings = ObTm::tensor(ObTm::list(vars));
-                    PatternTm::let_(bindings, app, tm.clone())
+                    ObTm::tensor(ObTm::list(vars))
                 };
+
+                let args = MorTm::list(interface_added.iter().map(|var| MorTm::var(var.name)));
+                let restrict_along = MorTm::app(*op, args);
 
                 let mut interface = interface_kept.clone();
                 interface.append(&mut interface_added);
                 let state = SpeciesState {
-                    tm,
+                    tm: tm.restrict(restrict_at, restrict_along),
                     interface,
                     uf: uf.clone(),
                     min_match_idx,

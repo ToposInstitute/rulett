@@ -250,7 +250,7 @@ impl MorTm {
     /// Simultaneously substitutes terms for free variables in the term.
     ///
     /// Warning: substitution is not capture-avoiding.
-    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> MorTm {
+    pub fn subst(&self, subst: &mut Vec<(Name, Self)>) -> Self {
         match self {
             MorTm::Var(name) => subst
                 .iter()
@@ -281,7 +281,7 @@ pub enum PatternTm {
     /// A restriction of an agent along a morphism.
     ///
     /// Example syntax: `A t`, where `t = [x, y]`
-    Restrict(Name, MorTm),
+    Res(Name, MorTm),
 
     /// A list of patterns.
     ///
@@ -311,7 +311,7 @@ pub enum PatternTm {
 impl fmt::Display for PatternTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PatternTm::Restrict(name, tm) => write!(f, "{name} {tm}"),
+            PatternTm::Res(name, tm) => write!(f, "{name} {tm}"),
             PatternTm::List(patterns) => write!(f, "[{}]", patterns.iter().join(", ")),
             PatternTm::Tensor(tm) => match &**tm {
                 PatternTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
@@ -325,9 +325,9 @@ impl fmt::Display for PatternTm {
 }
 
 impl PatternTm {
-    /// Smart constructor for [`Restriction`](Self::Restriction) variant.
-    pub fn restrict(name: impl Into<Name>, tm: MorTm) -> Self {
-        Self::Restrict(name.into(), tm)
+    /// Smart constructor for [`Res`](Self::Res) variant.
+    pub fn res(name: impl Into<Name>, tm: MorTm) -> Self {
+        Self::Res(name.into(), tm)
     }
 
     /// Smart constructor for [`List`](Self::List) variant.
@@ -345,12 +345,25 @@ impl PatternTm {
         Self::Let { bindings, bound, body: Box::new(body) }
     }
 
+    /// Restricts the pattern pattern at free variables along a morphism term.
+    ///
+    /// The codomain of the morphism should equal the type of the object term.
+    pub fn restrict(&self, at: ObTm, along: MorTm) -> Self {
+        if let ObTm::Var(var) = at {
+            // In the co-unary case, substitute along a single variable.
+            self.subst(&mut vec![(var, along)])
+        } else {
+            // Otherwise, introduce a let binding.
+            Self::let_(at, along, self.clone())
+        }
+    }
+
     /// Simultaneously substitutes terms for free variables in the pattern.
     ///
     /// Warning: Substitution is not capture-avoiding.
-    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> PatternTm {
+    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> Self {
         match self {
-            PatternTm::Restrict(name, tm) => PatternTm::restrict(*name, tm.subst(subst)),
+            PatternTm::Res(name, tm) => PatternTm::res(*name, tm.subst(subst)),
             PatternTm::List(patterns) => PatternTm::list(patterns.iter().map(|p| p.subst(subst))),
             PatternTm::Tensor(pattern) => PatternTm::tensor(pattern.subst(subst)),
             PatternTm::Let { bindings, bound, body } => {
@@ -429,8 +442,8 @@ mod tests {
         // Basic substitution.
         let mut subst = vec![(name("x"), MorTm::app("f", MorTm::var("a")))];
         let tm = PatternTm::tensor(PatternTm::list([
-            PatternTm::restrict("A", MorTm::list([MorTm::var("x")])),
-            PatternTm::restrict("B", MorTm::list([MorTm::var("y")])),
+            PatternTm::res("A", MorTm::list([MorTm::var("x")])),
+            PatternTm::res("B", MorTm::list([MorTm::var("y")])),
         ]));
         expect!["(A [x], B [y])"].assert_eq(&tm.to_string());
         expect!["(A [f a], B [y])"].assert_eq(&tm.subst(&mut subst).to_string());
@@ -440,10 +453,7 @@ mod tests {
         let tm = PatternTm::let_(
             ObTm::list([ObTm::var("x"), ObTm::var("z")]),
             MorTm::list([MorTm::var("x"), MorTm::var("y")]),
-            PatternTm::restrict(
-                "A",
-                MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
-            ),
+            PatternTm::res("A", MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")])),
         );
         expect!["let [x, z] = [x, y] in A [x, y, z]"].assert_eq(&tm.to_string());
         expect!["let [x, z] = [a, b] in A [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
