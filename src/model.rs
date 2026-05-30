@@ -10,7 +10,7 @@ pub enum ModelDecl {
     /// Declaration of an agent.
     ///
     /// The variable names defined by the [`ObTm`] are logically superfluous,
-    /// but are included as a kind of documentation and for consistency with
+    /// but are included as a form of documentation and to be consistent with
     /// rule declarations, where they are necessary.
     Agent { name: Name, interface: (ObTm, Ty) },
 
@@ -18,8 +18,8 @@ pub enum ModelDecl {
     Rule {
         name: Name,
         interface: (ObTm, Ty),
-        lhs: PatternTm,
-        rhs: PatternTm,
+        lhs: PatTm,
+        rhs: PatTm,
     },
 }
 
@@ -37,22 +37,16 @@ impl ModelDecl {
         name: impl Into<Name>,
         tm: impl Into<ObTm>,
         ty: impl Into<Ty>,
-        lhs: PatternTm,
-        rhs: PatternTm,
+        lhs: impl Into<PatTm>,
+        rhs: impl Into<PatTm>,
     ) -> Self {
         Self::Rule {
             name: name.into(),
             interface: (tm.into(), ty.into()),
-            lhs,
-            rhs,
+            lhs: lhs.into(),
+            rhs: rhs.into(),
         }
     }
-}
-
-struct BasicRuleData {
-    interface: ObTmJudgment,
-    lhs: PatternTm,
-    rhs: PatternTm,
 }
 
 /// A rule-based model.
@@ -60,6 +54,12 @@ pub struct Model {
     signature: Signature,
     agents: IndexMap<Name, ObTmJudgment>,
     rules: IndexMap<Name, BasicRuleData>,
+}
+
+struct BasicRuleData {
+    interface: ObTmJudgment,
+    lhs: PatTm,
+    rhs: PatTm,
 }
 
 impl Model {
@@ -102,7 +102,7 @@ impl Model {
     /// Adds an agent with the given name and interface to the model.
     pub fn add_agent(&mut self, name: Name, tm: ObTm, ty: Ty) -> Result<(), String> {
         let interface = self.check_interface(tm, ty)?;
-        if self.agents.insert(name, interface).is_some() {
+        if self.rules.contains_key(&name) || self.agents.insert(name, interface).is_some() {
             return Err(format!("{name} already defined"));
         }
         Ok(())
@@ -114,13 +114,13 @@ impl Model {
         name: Name,
         tm: ObTm,
         ty: Ty,
-        lhs: PatternTm,
-        rhs: PatternTm,
+        lhs: PatTm,
+        rhs: PatTm,
     ) -> Result<(), String> {
         let interface = self.check_interface(tm, ty)?;
         // TODO: Type check left- and right-hand sides!
         let data = BasicRuleData { interface, lhs, rhs };
-        if self.rules.insert(name, data).is_some() {
+        if self.agents.contains_key(&name) || self.rules.insert(name, data).is_some() {
             return Err(format!("{name} already defined"));
         }
         Ok(())
@@ -169,7 +169,7 @@ impl Model {
     /// A *closed pattern* is a pattern with trivial interface. A *species* is
     /// an indecomposable closed pattern, i.e., a closed pattern that cannot be
     /// expressed as a non-trivial product of other closed patterns.
-    pub fn species(&self, max_agents: usize) -> Vec<PatternTm> {
+    pub fn species(&self, max_agents: usize) -> Vec<PatTm> {
         let finder = SpeciesFinder::new(&self.signature);
         (1..=max_agents)
             .flat_map(|n| self.agents.keys().copied().combinations_with_replacement(n))
@@ -185,13 +185,13 @@ impl Model {
 
 struct SpeciesFinder<'a> {
     signature: &'a Signature,
-    /// Index from flattened operation codomains to operations.
+    /// Index from flattened operation codomains to operation names.
     cod_index: HashMap<Vec<Name>, Vec<Name>>,
 }
 
 #[derive(Clone)]
 struct SpeciesState {
-    tm: PatternTm,
+    tm: PatTm,
     interface: Vec<IntermediateVar>,
     // Wrap the union find in `Rc` since we don't have to mutate it at each
     // branch point, only when restricting along an operation of co-arity >= 2.
@@ -218,7 +218,7 @@ impl<'a> SpeciesFinder<'a> {
     fn find(
         &self,
         interfaces: impl IntoIterator<Item = (Name, IndexMap<Name, Name>)>,
-    ) -> Vec<PatternTm> {
+    ) -> Vec<PatTm> {
         // Collect all variables, then ensure they are unique.
         let mut agents: Vec<(Name, Vec<Name>)> = Vec::new();
         let mut variables = Vec::new();
@@ -228,7 +228,7 @@ impl<'a> SpeciesFinder<'a> {
             // since any non-trivial product with the agent is decomposable.
             if interface.is_empty() {
                 return if i == 0 && interfaces.next().is_none() {
-                    vec![PatternTm::res(agent, MorTm::list([]))]
+                    vec![PatTm::res(agent, MorTm::list([]))]
                 } else {
                     vec![]
                 };
@@ -251,13 +251,13 @@ impl<'a> SpeciesFinder<'a> {
                 interface.push(IntermediateVar { name: var, sort, component: i });
                 vars.push(MorTm::var(var));
             }
-            terms.push(PatternTm::res(agent, MorTm::list(vars)));
+            terms.push(PatTm::res(agent, MorTm::list(vars)));
         }
         let n = terms.len();
         let tm = if n == 1 {
             terms.remove(0)
         } else {
-            PatternTm::tensor(PatternTm::list(terms))
+            PatTm::tensor(PatTm::list(terms))
         };
 
         // Initialize the search state, then run the search.
@@ -268,7 +268,7 @@ impl<'a> SpeciesFinder<'a> {
         results
     }
 
-    fn recurse(&self, state: SpeciesState, results: &mut Vec<PatternTm>) {
+    fn recurse(&self, state: SpeciesState, results: &mut Vec<PatTm>) {
         let SpeciesState { interface, tm, uf, min_match_idx } = state;
 
         // Success condition: found a closed term.
@@ -409,16 +409,16 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
             "bondAB",
             [ObTm::var("r")],
             [Ty::sort("Res")],
-            PatternTm::tensor([
-                PatternTm::res("A", [MorTm::var("r"), MorTm::app("empty", [])]),
-                PatternTm::res("B", [MorTm::app("empty", [])]),
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("r"), MorTm::app("empty", [])]),
+                PatTm::res("B", [MorTm::app("empty", [])]),
             ]),
-            PatternTm::let_(
+            PatTm::let_(
                 [ObTm::var("s1"), ObTm::var("s2")],
                 MorTm::app("bond", []),
-                PatternTm::tensor([
-                    PatternTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
-                    PatternTm::res("B", [MorTm::var("s2")]),
+                PatTm::tensor([
+                    PatTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
+                    PatTm::res("B", [MorTm::var("s2")]),
                 ]),
             ),
         ),
@@ -426,13 +426,13 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
             "phosphorylate",
             [ObTm::var("s")],
             [Ty::sort(site_a)],
-            PatternTm::tensor([
-                PatternTm::res("A", [MorTm::app("unphos", []), MorTm::var("s")]),
-                PatternTm::res("K", []),
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::app("unphos", []), MorTm::var("s")]),
+                PatTm::res("K", []),
             ]),
-            PatternTm::tensor([
-                PatternTm::res("A", [MorTm::app("phos", []), MorTm::var("s")]),
-                PatternTm::res("K", []),
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::app("phos", []), MorTm::var("s")]),
+                PatTm::res("K", []),
             ]),
         ),
     ]

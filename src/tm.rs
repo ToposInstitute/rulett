@@ -1,3 +1,5 @@
+//! Terms for rule-based models.
+
 use std::fmt;
 
 use super::{prelude::*, ty::*};
@@ -18,7 +20,7 @@ pub enum ObTm {
     /// Example syntax: `[x, y, z]`
     List(Vec<ObTm>),
 
-    /// An application of the tensor to a term.
+    /// An application of the tensor product to a term.
     ///
     /// Example syntax: `⊗ [t, s]`
     Tensor(Box<ObTm>),
@@ -292,8 +294,8 @@ impl MorTm {
                 let new_bound = bound.subst(subst);
                 let shadowed = bindings.collect_vars().unwrap_or_default();
                 let n = shadowed.len();
-                for name in &shadowed {
-                    subst.push((*name, MorTm::var(*name)));
+                for &name in &shadowed {
+                    subst.push((name, MorTm::var(name)));
                 }
                 let new_body = body.subst(subst);
                 subst.truncate(subst.len() - n);
@@ -304,22 +306,27 @@ impl MorTm {
 }
 
 /// Pattern term in a rule-based model.
+///
+/// Pattern terms ("pat-terms") are used to represent both indexed objects
+/// ("patterns" in Kappa) and indexed morphisms (derived rules) excluding their
+/// (co)domains. In the latter case, we follow the category theorist's tradition
+/// of an identifying an object with its identity morphism.
 #[derive(Clone, PartialEq, Eq)]
-pub enum PatternTm {
-    /// A restriction of an agent along a morphism.
+pub enum PatTm {
+    /// A restriction of an agent or a basic rule along a morphism.
     ///
-    /// Example syntax: `A t`, where `t = [x, y]`
+    /// Example syntax: `A t` or `R t`, where `t = [x, y]`
     Res(Name, MorTm),
 
     /// A list of patterns.
     ///
-    /// Example syntax: `[A [x], B [y]]`
-    List(Vec<PatternTm>),
+    /// Example syntax: `[A [x], R [y]]`
+    List(Vec<PatTm>),
 
-    /// An application of the tensor product to a pattern.
+    /// An application of the tensor product.
     ///
-    /// Example syntax: `⊗ [A [x], B [y]]`
-    Tensor(Box<PatternTm>),
+    /// Example syntax: `⊗ [A [x], R [y]]`
+    Tensor(Box<PatTm>),
 
     /// A let binding.
     ///
@@ -332,51 +339,51 @@ pub enum PatternTm {
     Let {
         bindings: ObTm,
         bound: MorTm,
-        body: Box<PatternTm>,
+        body: Box<PatTm>,
     },
 }
 
-impl fmt::Display for PatternTm {
+impl fmt::Display for PatTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PatternTm::Res(name, tm) => write!(f, "{name} {tm}"),
-            PatternTm::List(patterns) => write!(f, "[{}]", patterns.iter().join(", ")),
-            PatternTm::Tensor(tm) => match &**tm {
-                PatternTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
+            PatTm::Res(name, tm) => write!(f, "{name} {tm}"),
+            PatTm::List(patterns) => write!(f, "[{}]", patterns.iter().join(", ")),
+            PatTm::Tensor(tm) => match &**tm {
+                PatTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
                 _ => write!(f, "⊗ {tm}"),
             },
-            PatternTm::Let { bindings, bound, body } => {
+            PatTm::Let { bindings, bound, body } => {
                 write!(f, "let {bindings} = {bound} in {body}")
             }
         }
     }
 }
 
-impl FromIterator<PatternTm> for PatternTm {
-    fn from_iter<T: IntoIterator<Item = PatternTm>>(iter: T) -> Self {
+impl FromIterator<PatTm> for PatTm {
+    fn from_iter<T: IntoIterator<Item = PatTm>>(iter: T) -> Self {
         Self::List(iter.into_iter().collect())
     }
 }
 
-impl<const N: usize> From<[PatternTm; N]> for PatternTm {
-    fn from(value: [PatternTm; N]) -> Self {
+impl<const N: usize> From<[PatTm; N]> for PatTm {
+    fn from(value: [PatTm; N]) -> Self {
         Self::List(value.into())
     }
 }
 
-impl PatternTm {
+impl PatTm {
     /// Smart constructor for [`Res`](Self::Res) variant.
     pub fn res(name: impl Into<Name>, tm: impl Into<MorTm>) -> Self {
         Self::Res(name.into(), tm.into())
     }
 
     /// Smart constructor for [`List`](Self::List) variant.
-    pub fn list(patterns: impl IntoIterator<Item = PatternTm>) -> Self {
+    pub fn list(patterns: impl IntoIterator<Item = PatTm>) -> Self {
         Self::from_iter(patterns)
     }
 
     /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(pattern: impl Into<PatternTm>) -> Self {
+    pub fn tensor(pattern: impl Into<PatTm>) -> Self {
         Self::Tensor(Box::new(pattern.into()))
     }
 
@@ -384,7 +391,7 @@ impl PatternTm {
     pub fn let_(
         bindings: impl Into<ObTm>,
         bound: impl Into<MorTm>,
-        body: impl Into<PatternTm>,
+        body: impl Into<PatTm>,
     ) -> Self {
         Self::Let {
             bindings: bindings.into(),
@@ -393,7 +400,7 @@ impl PatternTm {
         }
     }
 
-    /// Restricts the pattern pattern at free variables along a morphism term.
+    /// Restricts the pattern term at free variables along a morphism term.
     ///
     /// The codomain of the morphism should equal the type of the object term.
     pub fn restrict(&self, at: ObTm, along: MorTm) -> Self {
@@ -411,20 +418,81 @@ impl PatternTm {
     /// Warning: Substitution is not capture-avoiding.
     pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> Self {
         match self {
-            PatternTm::Res(name, tm) => PatternTm::res(*name, tm.subst(subst)),
-            PatternTm::List(patterns) => PatternTm::list(patterns.iter().map(|p| p.subst(subst))),
-            PatternTm::Tensor(pattern) => PatternTm::tensor(pattern.subst(subst)),
-            PatternTm::Let { bindings, bound, body } => {
+            PatTm::Res(name, tm) => PatTm::res(*name, tm.subst(subst)),
+            PatTm::List(patterns) => PatTm::list(patterns.iter().map(|p| p.subst(subst))),
+            PatTm::Tensor(pattern) => PatTm::tensor(pattern.subst(subst)),
+            PatTm::Let { bindings, bound, body } => {
                 let new_bound = bound.subst(subst);
                 let shadowed = bindings.collect_vars().unwrap_or_default();
                 let n = shadowed.len();
-                for name in &shadowed {
-                    subst.push((*name, MorTm::var(*name)));
+                for &name in &shadowed {
+                    subst.push((name, MorTm::var(name)));
                 }
                 let new_body = body.subst(subst);
                 subst.truncate(subst.len() - n);
-                PatternTm::let_(bindings.clone(), new_bound, new_body)
+                PatTm::let_(bindings.clone(), new_bound, new_body)
             }
+        }
+    }
+}
+
+/// Rule term.
+///
+/// A rule term represents an indexed morphism (derived rule) including its
+/// domain (left-hand side) and codomain (right-hand side).
+pub struct RuleTm {
+    /// Term for rule itself.
+    pub rule: PatTm,
+    /// Term for left-hand side of rule.
+    pub lhs: PatTm,
+    /// Term for right-hand side of rule.
+    pub rhs: PatTm,
+}
+
+impl RuleTm {
+    /// Constructs a list of rule terms.
+    pub fn list(rules: Vec<RuleTm>) -> Self {
+        let n = rules.len();
+        let (mut rule, mut lhs, mut rhs) =
+            (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+        for r in rules {
+            rule.push(r.rule);
+            lhs.push(r.lhs);
+            rhs.push(r.rhs);
+        }
+        Self {
+            rule: PatTm::list(rule),
+            lhs: PatTm::list(lhs),
+            rhs: PatTm::list(rhs),
+        }
+    }
+
+    /// Constructs an application of the tensor product to a rule term.
+    pub fn tensor(rule: RuleTm) -> Self {
+        Self {
+            rule: PatTm::tensor(rule.rule),
+            lhs: PatTm::tensor(rule.lhs),
+            rhs: PatTm::tensor(rule.rhs),
+        }
+    }
+
+    /// Restricts the rule term at free variables along a morphism term.
+    pub fn restrict(&self, at: ObTm, along: MorTm) -> Self {
+        Self {
+            rule: self.rule.restrict(at.clone(), along.clone()),
+            lhs: self.lhs.restrict(at.clone(), along.clone()),
+            rhs: self.rhs.restrict(at, along),
+        }
+    }
+
+    /// Simultaneously substitutes terms for free variables in the rule.
+    ///
+    /// Warning: Substitution is not capture-avoiding.
+    pub fn subst(&self, subst: &mut Vec<(Name, MorTm)>) -> Self {
+        Self {
+            rule: self.rule.subst(subst),
+            lhs: self.lhs.subst(subst),
+            rhs: self.rhs.subst(subst),
         }
     }
 }
@@ -489,19 +557,17 @@ mod tests {
     fn subst_pattern() {
         // Basic substitution.
         let mut subst = vec![(name("x"), MorTm::app("f", MorTm::var("a")))];
-        let tm = PatternTm::tensor([
-            PatternTm::res("A", [MorTm::var("x")]),
-            PatternTm::res("B", [MorTm::var("y")]),
-        ]);
+        let tm =
+            PatTm::tensor([PatTm::res("A", [MorTm::var("x")]), PatTm::res("B", [MorTm::var("y")])]);
         expect!["(A [x], B [y])"].assert_eq(&tm.to_string());
         expect!["(A [f a], B [y])"].assert_eq(&tm.subst(&mut subst).to_string());
 
         // Let bindings, with shadowing.
         let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];
-        let tm = PatternTm::let_(
+        let tm = PatTm::let_(
             [ObTm::var("x"), ObTm::var("z")],
             [MorTm::var("x"), MorTm::var("y")],
-            PatternTm::res("A", [MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
+            PatTm::res("A", [MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
         );
         expect!["let [x, z] = [x, y] in A [x, y, z]"].assert_eq(&tm.to_string());
         expect!["let [x, z] = [a, b] in A [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
