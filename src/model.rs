@@ -25,8 +25,11 @@ pub enum ModelDecl {
 
 impl ModelDecl {
     /// Smart constructor for [`Agent`](Self::Agent) variant.
-    pub fn agent(name: impl Into<Name>, tm: ObTm, ty: Ty) -> Self {
-        Self::Agent { name: name.into(), interface: (tm, ty) }
+    pub fn agent(name: impl Into<Name>, tm: impl Into<ObTm>, ty: impl Into<Ty>) -> Self {
+        Self::Agent {
+            name: name.into(),
+            interface: (tm.into(), ty.into()),
+        }
     }
 }
 
@@ -327,11 +330,11 @@ pub(crate) fn toy_model_v1() -> Model {
     let decls = [
         ModelDecl::agent(
             "A",
-            ObTm::list([ObTm::var("r"), ObTm::var("s")]),
-            Ty::list([Ty::sort("Res"), Ty::sort("Site")]),
+            [ObTm::var("r"), ObTm::var("s")],
+            [Ty::sort("Res"), Ty::sort("Site")],
         ),
-        ModelDecl::agent("B", ObTm::list([ObTm::var("s")]), Ty::list([Ty::sort("Site")])),
-        ModelDecl::agent("K", ObTm::list([]), Ty::list([])),
+        ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort("Site")]),
+        ModelDecl::agent("K", [], []),
     ];
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
@@ -342,11 +345,11 @@ pub(crate) fn toy_model_v2() -> Model {
     let decls = [
         ModelDecl::agent(
             "A",
-            ObTm::list([ObTm::var("r"), ObTm::var("s")]),
-            Ty::list([Ty::sort("Res"), Ty::sort("SiteA")]),
+            [ObTm::var("r"), ObTm::var("s")],
+            [Ty::sort("Res"), Ty::sort("SiteA")],
         ),
-        ModelDecl::agent("B", ObTm::list([ObTm::var("s")]), Ty::list([Ty::sort("SiteB")])),
-        ModelDecl::agent("K", ObTm::list([]), Ty::list([])),
+        ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort("SiteB")]),
+        ModelDecl::agent("K", [], []),
     ];
     Model::parse(toy_signature_v2(), decls).unwrap()
 }

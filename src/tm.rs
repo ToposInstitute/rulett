@@ -37,6 +37,18 @@ impl fmt::Display for ObTm {
     }
 }
 
+impl FromIterator<ObTm> for ObTm {
+    fn from_iter<T: IntoIterator<Item = ObTm>>(iter: T) -> Self {
+        Self::List(iter.into_iter().collect())
+    }
+}
+
+impl<const N: usize> From<[ObTm; N]> for ObTm {
+    fn from(value: [ObTm; N]) -> Self {
+        Self::List(value.into())
+    }
+}
+
 impl ObTm {
     /// Smart constructor for [`Var`](Self::Var) variant.
     pub fn var(name: impl Into<Name>) -> Self {
@@ -45,12 +57,12 @@ impl ObTm {
 
     /// Smart constructor for [`List`](Self::List) variant.
     pub fn list(terms: impl IntoIterator<Item = ObTm>) -> Self {
-        Self::List(terms.into_iter().collect())
+        Self::from_iter(terms)
     }
 
     /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(tm: ObTm) -> Self {
-        Self::Tensor(Box::new(tm))
+    pub fn tensor(tm: impl Into<ObTm>) -> Self {
+        Self::Tensor(Box::new(tm.into()))
     }
 
     /// Checks whether the term has the given type.
@@ -217,6 +229,18 @@ impl fmt::Display for MorTm {
     }
 }
 
+impl FromIterator<MorTm> for MorTm {
+    fn from_iter<T: IntoIterator<Item = MorTm>>(iter: T) -> Self {
+        Self::List(iter.into_iter().collect())
+    }
+}
+
+impl<const N: usize> From<[MorTm; N]> for MorTm {
+    fn from(value: [MorTm; N]) -> Self {
+        Self::List(value.into())
+    }
+}
+
 impl MorTm {
     /// Smart constructor for [`Var`](Self::Var) variant.
     pub fn var(name: impl Into<Name>) -> Self {
@@ -225,25 +249,29 @@ impl MorTm {
 
     /// Smart constructor for [`List`](Self::List) variant.
     pub fn list(terms: impl IntoIterator<Item = MorTm>) -> Self {
-        Self::List(terms.into_iter().collect())
+        Self::from_iter(terms)
     }
 
     /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(tm: MorTm) -> Self {
-        Self::Tensor(Box::new(tm))
+    pub fn tensor(tm: impl Into<MorTm>) -> Self {
+        Self::Tensor(Box::new(tm.into()))
     }
 
     /// Smart constructor for [`App`](Self::App) variant.
-    pub fn app(name: impl Into<Name>, tm: MorTm) -> Self {
-        Self::App(name.into(), Box::new(tm))
+    pub fn app(name: impl Into<Name>, tm: impl Into<MorTm>) -> Self {
+        Self::App(name.into(), Box::new(tm.into()))
     }
 
     /// Smart constructor for [`Let`](Self::Let) variant.
-    pub fn let_(bindings: ObTm, bound: MorTm, body: MorTm) -> Self {
+    pub fn let_(
+        bindings: impl Into<ObTm>,
+        bound: impl Into<MorTm>,
+        body: impl Into<MorTm>,
+    ) -> Self {
         Self::Let {
-            bindings,
-            bound: Box::new(bound),
-            body: Box::new(body),
+            bindings: bindings.into(),
+            bound: Box::new(bound.into()),
+            body: Box::new(body.into()),
         }
     }
 
@@ -324,25 +352,45 @@ impl fmt::Display for PatternTm {
     }
 }
 
+impl FromIterator<PatternTm> for PatternTm {
+    fn from_iter<T: IntoIterator<Item = PatternTm>>(iter: T) -> Self {
+        Self::List(iter.into_iter().collect())
+    }
+}
+
+impl<const N: usize> From<[PatternTm; N]> for PatternTm {
+    fn from(value: [PatternTm; N]) -> Self {
+        Self::List(value.into())
+    }
+}
+
 impl PatternTm {
     /// Smart constructor for [`Res`](Self::Res) variant.
-    pub fn res(name: impl Into<Name>, tm: MorTm) -> Self {
-        Self::Res(name.into(), tm)
+    pub fn res(name: impl Into<Name>, tm: impl Into<MorTm>) -> Self {
+        Self::Res(name.into(), tm.into())
     }
 
     /// Smart constructor for [`List`](Self::List) variant.
     pub fn list(patterns: impl IntoIterator<Item = PatternTm>) -> Self {
-        Self::List(patterns.into_iter().collect())
+        Self::from_iter(patterns)
     }
 
     /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(pattern: PatternTm) -> Self {
-        Self::Tensor(Box::new(pattern))
+    pub fn tensor(pattern: impl Into<PatternTm>) -> Self {
+        Self::Tensor(Box::new(pattern.into()))
     }
 
     /// Smart constructor for [`Let`](Self::Let) variant.
-    pub fn let_(bindings: ObTm, bound: MorTm, body: PatternTm) -> Self {
-        Self::Let { bindings, bound, body: Box::new(body) }
+    pub fn let_(
+        bindings: impl Into<ObTm>,
+        bound: impl Into<MorTm>,
+        body: impl Into<PatternTm>,
+    ) -> Self {
+        Self::Let {
+            bindings: bindings.into(),
+            bound: bound.into(),
+            body: Box::new(body.into()),
+        }
     }
 
     /// Restricts the pattern pattern at free variables along a morphism term.
@@ -406,8 +454,8 @@ mod tests {
         err.assert_eq(&tm.check(&Ty::list([Ty::sort("X"), Ty::sort("X")])).unwrap_err());
 
         // Tensors.
-        let tm = ObTm::tensor(ObTm::list([ObTm::var("x"), ObTm::var("y")]));
-        let ty = Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]));
+        let tm = ObTm::tensor([ObTm::var("x"), ObTm::var("y")]);
+        let ty = Ty::tensor([Ty::sort("X"), Ty::sort("Y")]);
         assert!(tm.check(&ty).is_ok());
         let err = expect!["tensor term should have tensor type: (x, y) vs X"];
         err.assert_eq(&tm.check(&Ty::sort("X")).unwrap_err());
@@ -421,15 +469,15 @@ mod tests {
         expect!["y"].assert_eq(&MorTm::var("y").subst(&mut subst).to_string());
 
         // Lists, applications, etc.
-        let tm = MorTm::app("g", MorTm::list([MorTm::var("x"), MorTm::var("y")]));
+        let tm = MorTm::app("g", [MorTm::var("x"), MorTm::var("y")]);
         expect!["g [f a, y]"].assert_eq(&tm.subst(&mut subst).to_string());
 
         // Let bindings, with shadowing.
         let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];
         let tm = MorTm::let_(
-            ObTm::list([ObTm::var("x"), ObTm::var("z")]),
-            MorTm::list([MorTm::var("x"), MorTm::var("y")]),
-            MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
+            [ObTm::var("x"), ObTm::var("z")],
+            [MorTm::var("x"), MorTm::var("y")],
+            [MorTm::var("x"), MorTm::var("y"), MorTm::var("z")],
         );
         expect!["let [x, z] = [x, y] in [x, y, z]"].assert_eq(&tm.to_string());
         expect!["let [x, z] = [a, b] in [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
@@ -441,19 +489,19 @@ mod tests {
     fn subst_pattern() {
         // Basic substitution.
         let mut subst = vec![(name("x"), MorTm::app("f", MorTm::var("a")))];
-        let tm = PatternTm::tensor(PatternTm::list([
-            PatternTm::res("A", MorTm::list([MorTm::var("x")])),
-            PatternTm::res("B", MorTm::list([MorTm::var("y")])),
-        ]));
+        let tm = PatternTm::tensor([
+            PatternTm::res("A", [MorTm::var("x")]),
+            PatternTm::res("B", [MorTm::var("y")]),
+        ]);
         expect!["(A [x], B [y])"].assert_eq(&tm.to_string());
         expect!["(A [f a], B [y])"].assert_eq(&tm.subst(&mut subst).to_string());
 
         // Let bindings, with shadowing.
         let mut subst = vec![(name("x"), MorTm::var("a")), (name("y"), MorTm::var("b"))];
         let tm = PatternTm::let_(
-            ObTm::list([ObTm::var("x"), ObTm::var("z")]),
-            MorTm::list([MorTm::var("x"), MorTm::var("y")]),
-            PatternTm::res("A", MorTm::list([MorTm::var("x"), MorTm::var("y"), MorTm::var("z")])),
+            [ObTm::var("x"), ObTm::var("z")],
+            [MorTm::var("x"), MorTm::var("y")],
+            PatternTm::res("A", [MorTm::var("x"), MorTm::var("y"), MorTm::var("z")]),
         );
         expect!["let [x, z] = [x, y] in A [x, y, z]"].assert_eq(&tm.to_string());
         expect!["let [x, z] = [a, b] in A [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());

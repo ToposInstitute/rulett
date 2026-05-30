@@ -29,8 +29,8 @@ impl SignatureDecl {
     }
 
     /// Smart constructor for [`Operation`](Self::Operation) variant.
-    pub fn operation(name: impl Into<Name>, dom: Ty, cod: Ty) -> Self {
-        Self::Operation(name.into(), dom, cod)
+    pub fn operation(name: impl Into<Name>, dom: impl Into<Ty>, cod: impl Into<Ty>) -> Self {
+        Self::Operation(name.into(), dom.into(), cod.into())
     }
 }
 
@@ -166,15 +166,11 @@ impl fmt::Display for Signature {
 pub(crate) fn toy_signature_v1() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Res"),
-        SignatureDecl::operation("unphos", Ty::list([]), Ty::sort("Res")),
-        SignatureDecl::operation("phos", Ty::list([]), Ty::sort("Res")),
+        SignatureDecl::operation("unphos", [], Ty::sort("Res")),
+        SignatureDecl::operation("phos", [], Ty::sort("Res")),
         SignatureDecl::sort("Site"),
-        SignatureDecl::operation("empty", Ty::list([]), Ty::sort("Site")),
-        SignatureDecl::operation(
-            "bond",
-            Ty::list([]),
-            Ty::tensor(Ty::list([Ty::sort("Site"), Ty::sort("Site")])),
-        ),
+        SignatureDecl::operation("empty", [], Ty::sort("Site")),
+        SignatureDecl::operation("bond", [], Ty::tensor([Ty::sort("Site"), Ty::sort("Site")])),
     ])
     .unwrap()
 }
@@ -184,17 +180,13 @@ pub(crate) fn toy_signature_v1() -> Signature {
 pub(crate) fn toy_signature_v2() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Res"),
-        SignatureDecl::operation("unphos", Ty::list([]), Ty::sort("Res")),
-        SignatureDecl::operation("phos", Ty::list([]), Ty::sort("Res")),
+        SignatureDecl::operation("unphos", [], Ty::sort("Res")),
+        SignatureDecl::operation("phos", [], Ty::sort("Res")),
         SignatureDecl::sort("SiteA"),
         SignatureDecl::sort("SiteB"),
-        SignatureDecl::operation("emptyA", Ty::list([]), Ty::sort("SiteA")),
-        SignatureDecl::operation("emptyB", Ty::list([]), Ty::sort("SiteB")),
-        SignatureDecl::operation(
-            "bond",
-            Ty::list([]),
-            Ty::tensor(Ty::list([Ty::sort("SiteA"), Ty::sort("SiteB")])),
-        ),
+        SignatureDecl::operation("emptyA", [], Ty::sort("SiteA")),
+        SignatureDecl::operation("emptyB", [], Ty::sort("SiteB")),
+        SignatureDecl::operation("bond", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
     ])
     .unwrap()
 }

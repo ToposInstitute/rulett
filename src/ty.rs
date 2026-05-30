@@ -71,6 +71,18 @@ pub enum Ty {
     Tensor(Box<Ty>),
 }
 
+impl FromIterator<Ty> for Ty {
+    fn from_iter<T: IntoIterator<Item = Ty>>(iter: T) -> Self {
+        Self::List(iter.into_iter().collect())
+    }
+}
+
+impl<const N: usize> From<[Ty; N]> for Ty {
+    fn from(value: [Ty; N]) -> Self {
+        Self::List(value.into())
+    }
+}
+
 impl Ty {
     /// Smart constructor for [`Sort`](Self::Sort) variant.
     pub fn sort(name: impl Into<Name>) -> Self {
@@ -79,12 +91,12 @@ impl Ty {
 
     /// Smart constructor for [`List`](Self::List) variant.
     pub fn list(types: impl IntoIterator<Item = Ty>) -> Self {
-        Self::List(types.into_iter().collect())
+        Self::from_iter(types)
     }
 
     /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(ty: Ty) -> Self {
-        Self::Tensor(Box::new(ty))
+    pub fn tensor(ty: impl Into<Ty>) -> Self {
+        Self::Tensor(Box::new(ty.into()))
     }
 
     /// Collects all the sorts that appear in the type.
@@ -152,7 +164,7 @@ mod tests {
         assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y"), name("X")]);
 
         // Tensors.
-        let ty = Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]));
+        let ty = Ty::tensor([Ty::sort("X"), Ty::sort("Y")]);
         assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y")]);
     }
 
@@ -176,7 +188,7 @@ mod tests {
         err.assert_eq(&syn(Ty::list([Ty::sort("X"), Ty::list([])])));
 
         // Tensors.
-        assert_eq!(syn(Ty::tensor(Ty::list([Ty::sort("X"), Ty::sort("Y")]))), "*");
+        assert_eq!(syn(Ty::tensor([Ty::sort("X"), Ty::sort("Y")])), "*");
         let err = expect!["ERROR: tensor should be applied to list, received: X"];
         err.assert_eq(&syn(Ty::tensor(Ty::sort("X"))));
     }
