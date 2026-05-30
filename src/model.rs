@@ -31,19 +31,45 @@ impl ModelDecl {
             interface: (tm.into(), ty.into()),
         }
     }
+
+    /// Smart constructor for [`Rule`](Self::Rule) variant.
+    pub fn rule(
+        name: impl Into<Name>,
+        tm: impl Into<ObTm>,
+        ty: impl Into<Ty>,
+        lhs: PatternTm,
+        rhs: PatternTm,
+    ) -> Self {
+        Self::Rule {
+            name: name.into(),
+            interface: (tm.into(), ty.into()),
+            lhs,
+            rhs,
+        }
+    }
+}
+
+struct BasicRuleData {
+    interface: ObTmJudgment,
+    lhs: PatternTm,
+    rhs: PatternTm,
 }
 
 /// A rule-based model.
 pub struct Model {
     signature: Signature,
     agents: IndexMap<Name, ObTmJudgment>,
-    // TODO: Rules
+    rules: IndexMap<Name, BasicRuleData>,
 }
 
 impl Model {
     /// Constructs an empty model over a signature.
     pub fn new(signature: Signature) -> Self {
-        Self { signature, agents: Default::default() }
+        Self {
+            signature,
+            agents: Default::default(),
+            rules: Default::default(),
+        }
     }
 
     /// Parses a model from a signature and a list of declarations.
@@ -67,25 +93,51 @@ impl Model {
             ModelDecl::Agent { name, interface: (tm, ty) } => self
                 .add_agent(name, tm, ty)
                 .map_err(|err| format!("cannot declare agent {name}: {err}")),
-            ModelDecl::Rule { .. } => todo!("parsing rules"),
+            ModelDecl::Rule { name, interface: (tm, ty), lhs, rhs } => self
+                .add_rule(name, tm, ty, lhs, rhs)
+                .map_err(|err| format!("cannot declare rule {name}: {err}")),
         }
     }
 
     /// Adds an agent with the given name and interface to the model.
     pub fn add_agent(&mut self, name: Name, tm: ObTm, ty: Ty) -> Result<(), String> {
-        if !self
-            .signature
-            .check_ty(&ty, &Kind::list(Kind::prim()))
-            .map_err(|err| format!("interface has invalid type: {err}"))?
-        {
-            return Err(format!("interface type should be a list of sorts, received: {ty}"));
-        }
-        let judgment =
-            ObTmJudgment::judge(tm, ty).map_err(|err| format!("invalid interface: {err}"))?;
-        if self.agents.insert(name, judgment).is_some() {
+        let interface = self.check_interface(tm, ty)?;
+        if self.agents.insert(name, interface).is_some() {
             return Err(format!("{name} already defined"));
         }
         Ok(())
+    }
+
+    /// Adds a basic rule to the model.
+    pub fn add_rule(
+        &mut self,
+        name: Name,
+        tm: ObTm,
+        ty: Ty,
+        lhs: PatternTm,
+        rhs: PatternTm,
+    ) -> Result<(), String> {
+        let interface = self.check_interface(tm, ty)?;
+        // TODO: Type check left- and right-hand sides!
+        let data = BasicRuleData { interface, lhs, rhs };
+        if self.rules.insert(name, data).is_some() {
+            return Err(format!("{name} already defined"));
+        }
+        Ok(())
+    }
+
+    /// Checks that interface to agent or rule is well-typed.
+    fn check_interface(&self, tm: ObTm, ty: Ty) -> Result<ObTmJudgment, String> {
+        self.signature
+            .check_ty(&ty, &Kind::list(Kind::prim()))
+            .map_err(|err| format!("interface has invalid type: {err}"))
+            .and_then(|ok| {
+                if ok {
+                    ObTmJudgment::judge(tm, ty).map_err(|err| format!("ill-typed interface: {err}"))
+                } else {
+                    Err(format!("interface type should be a list of sorts, received: {ty}"))
+                }
+            })
     }
 
     /// Iterates over the agents in the model.
@@ -99,8 +151,13 @@ impl fmt::Display for Model {
         self.signature.fmt(f)?;
         writeln!(f, "#/ agents:")?;
         for (name, interface) in self.agents() {
-            let (tm, ty) = (&interface.tm, &interface.ty);
+            let ObTmJudgment { tm, ty } = interface;
             writeln!(f, "{tm} : {ty} ⊢ {name} {tm}")?;
+        }
+        writeln!(f, "#/ rules:")?;
+        for (&name, BasicRuleData { interface, lhs, rhs }) in &self.rules {
+            let ObTmJudgment { tm, ty } = interface;
+            writeln!(f, "{tm} : {ty} ⊢ {name} {tm} : {lhs} → {rhs}")?;
         }
         Ok(())
     }
@@ -327,31 +384,58 @@ fn gen_var_with_sort(sort: &Name) -> Name {
 /// A toy example of a ruled-based model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_model_v1() -> Model {
-    let decls = [
-        ModelDecl::agent(
-            "A",
-            [ObTm::var("r"), ObTm::var("s")],
-            [Ty::sort("Res"), Ty::sort("Site")],
-        ),
-        ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort("Site")]),
-        ModelDecl::agent("K", [], []),
-    ];
+    let decls = toy_model_decls("Site", "Site");
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
 
 /// A toy example of a ruled-based model (variant 2).
 #[cfg(test)]
 pub(crate) fn toy_model_v2() -> Model {
-    let decls = [
+    let decls = toy_model_decls("SiteA", "SiteB");
+    Model::parse(toy_signature_v2(), decls).unwrap()
+}
+
+#[cfg(test)]
+fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
+    [
         ModelDecl::agent(
             "A",
             [ObTm::var("r"), ObTm::var("s")],
-            [Ty::sort("Res"), Ty::sort("SiteA")],
+            [Ty::sort("Res"), Ty::sort(site_a)],
         ),
-        ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort("SiteB")]),
+        ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort(site_b)]),
         ModelDecl::agent("K", [], []),
-    ];
-    Model::parse(toy_signature_v2(), decls).unwrap()
+        ModelDecl::rule(
+            "bondAB",
+            [ObTm::var("r")],
+            [Ty::sort("Res")],
+            PatternTm::tensor([
+                PatternTm::res("A", [MorTm::var("r"), MorTm::app("empty", [])]),
+                PatternTm::res("B", [MorTm::app("empty", [])]),
+            ]),
+            PatternTm::let_(
+                [ObTm::var("s1"), ObTm::var("s2")],
+                MorTm::app("bond", []),
+                PatternTm::tensor([
+                    PatternTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
+                    PatternTm::res("B", [MorTm::var("s2")]),
+                ]),
+            ),
+        ),
+        ModelDecl::rule(
+            "phosphorylate",
+            [ObTm::var("s")],
+            [Ty::sort(site_a)],
+            PatternTm::tensor([
+                PatternTm::res("A", [MorTm::app("unphos", []), MorTm::var("s")]),
+                PatternTm::res("K", []),
+            ]),
+            PatternTm::tensor([
+                PatternTm::res("A", [MorTm::app("phos", []), MorTm::var("s")]),
+                PatternTm::res("K", []),
+            ]),
+        ),
+    ]
 }
 
 #[cfg(test)]
@@ -374,6 +458,9 @@ mod tests {
             [r, s] : [Res, Site] ⊢ A [r, s]
             [s] : [Site] ⊢ B [s]
             [] : [] ⊢ K []
+            #/ rules:
+            [r] : [Res] ⊢ bondAB [r] : (A [r, empty []], B [empty []]) → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [Site] ⊢ phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&toy_model_v1().to_string());
 
@@ -392,6 +479,9 @@ mod tests {
             [r, s] : [Res, SiteA] ⊢ A [r, s]
             [s] : [SiteB] ⊢ B [s]
             [] : [] ⊢ K []
+            #/ rules:
+            [r] : [Res] ⊢ bondAB [r] : (A [r, empty []], B [empty []]) → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [SiteA] ⊢ phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&toy_model_v2().to_string());
     }
