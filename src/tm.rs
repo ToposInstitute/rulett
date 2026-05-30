@@ -1,5 +1,6 @@
 //! Terms for rule-based models.
 
+use derive_more::Display;
 use std::fmt;
 
 use super::{prelude::*, ty::*};
@@ -440,6 +441,8 @@ impl PatTm {
 ///
 /// A rule term represents an indexed morphism (derived rule) including its
 /// domain (left-hand side) and codomain (right-hand side).
+#[derive(Clone, PartialEq, Eq, Display)]
+#[display("{rule} : {lhs} → {rhs}")]
 pub struct RuleTm {
     /// Term for rule itself.
     pub rule: PatTm,
