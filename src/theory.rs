@@ -156,8 +156,7 @@ impl fmt::Display for Signature {
         }
         writeln!(f, "#/ operations:")?;
         for (op, dom, cod) in self.operations() {
-            let doc = mor_doc(RcDoc::text(op.as_str()), dom.to_doc(), cod.to_doc());
-            render_doc(doc, f)?;
+            render_doc(mor_doc(RcDoc::text(op.as_str()), dom.to_doc(), cod.to_doc()), f)?;
             writeln!(f)?;
         }
         Ok(())

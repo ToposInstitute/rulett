@@ -1,0 +1,371 @@
+//! Network generation from a rule-based model.
+
+use itertools::{chain, zip_eq};
+use std::rc::Rc;
+use union_find::{QuickUnionUf, UnionBySize, UnionFind};
+
+use super::{model::*, prelude::*, tm::*, ty::*};
+
+/// Wrapper enum for the two kinds of terms in a model.
+///
+/// This enum exists because the algorithms to generate species or transitions
+/// are essentially the same and thus can operate generically over this type
+/// instead of being duplicated for each case.
+#[derive(Clone, PartialEq, Eq)]
+pub enum ModelTm {
+    Pat(PatTm),
+    Rule(RuleTm),
+}
+
+impl ModelTm {
+    /// Deconstructor for [`Pat`](Self::Pat) variant.
+    fn take_pattern(self) -> Option<PatTm> {
+        match self {
+            Self::Pat(tm) => Some(tm),
+            Self::Rule(_) => None,
+        }
+    }
+
+    /// Deconstructor for the [`Rule`](Self::Rule) variant.
+    fn take_rule(self) -> Option<RuleTm> {
+        match self {
+            Self::Rule(tm) => Some(tm),
+            Self::Pat(_) => None,
+        }
+    }
+
+    /// Constructs a model term corresponding to an agent or basic rule.
+    fn basic(model: &Model, name: Name, terms: Vec<MorTm>) -> Option<Self> {
+        if model.has_agent(&name) {
+            Some(ModelTm::Pat(model.agent_tm(name, terms)))
+        } else if model.has_rule(&name) {
+            Some(ModelTm::Rule(model.rule_tm(name, terms)))
+        } else {
+            None
+        }
+    }
+
+    /// Constructs an application of the tensor product to a model term.
+    fn tensor(tm: ModelTm) -> Self {
+        match tm {
+            ModelTm::Pat(p) => ModelTm::Pat(PatTm::tensor(p)),
+            ModelTm::Rule(r) => ModelTm::Rule(RuleTm::tensor(r)),
+        }
+    }
+
+    /// Constructs a list of model terms.
+    fn list(terms: impl IntoIterator<Item = ModelTm>) -> Self {
+        let terms = terms.into_iter().collect_vec();
+        if terms.iter().any(|tm| matches!(tm, ModelTm::Rule(_))) {
+            // If any term is a rule, promote them all to rules.
+            let rules = terms
+                .into_iter()
+                .map(|tm| match tm {
+                    ModelTm::Rule(r) => r,
+                    ModelTm::Pat(p) => RuleTm { rule: p.clone(), lhs: p.clone(), rhs: p },
+                })
+                .collect_vec();
+            ModelTm::Rule(RuleTm::list(rules))
+        } else {
+            // Otherwise, we have a list of patterns.
+            let patterns = terms.into_iter().map(|tm| tm.take_pattern().unwrap());
+            ModelTm::Pat(PatTm::list(patterns))
+        }
+    }
+
+    /// Restricts the model term at free variables along a morphism term.
+    fn restrict(&self, at: ObTm, along: MorTm) -> Self {
+        match self {
+            ModelTm::Pat(p) => ModelTm::Pat(p.restrict(at, along)),
+            ModelTm::Rule(r) => ModelTm::Rule(r.restrict(at, along)),
+        }
+    }
+}
+
+/// Generates a reaction network from a rule-based model.
+pub struct NetGenerator<'a> {
+    /// Model to generate from.
+    model: &'a Model,
+
+    /// Index from flattened operation codomains to operation names.
+    ///
+    /// Note that operations are indexed on *all* unique permutations of their
+    /// codomain's sorts.
+    cod_index: HashMap<Vec<Name>, Vec<Name>>,
+}
+
+/// State maintained by search algorithm for network generation.
+#[derive(Clone)]
+struct SearchState {
+    tm: ModelTm,
+    interface: Vec<IntermediateVar>,
+    // Wrap the union find in `Rc` since we don't have to mutate it at each
+    // branch point, only when restricting along an operation of co-arity >= 2.
+    uf: Rc<QuickUnionUf<UnionBySize>>,
+    min_match_idx: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct IntermediateVar {
+    name: Name,
+    sort: Name,
+    component: usize,
+}
+
+impl<'a> NetGenerator<'a> {
+    /// Constructs a network generator for the given model.
+    pub fn new(model: &'a Model) -> Self {
+        let mut cod_index = HashMap::<_, Vec<_>>::new();
+        for (name, _, cod) in model.signature().operations() {
+            let sorts = cod.collect_sorts();
+            let n = sorts.len();
+            for ordering in sorts.into_iter().permutations(n).unique() {
+                cod_index.entry(ordering).or_default().push(name);
+            }
+        }
+        Self { model, cod_index }
+    }
+
+    /// Generates species from the model up to a specified size.
+    ///
+    /// A *closed pattern* is a pattern with trivial interface. A *species* is
+    /// an indecomposable closed pattern, i.e., a closed pattern that cannot be
+    /// expressed as a non-trivial product of other closed patterns.
+    pub fn species(&self, max_agents: usize) -> impl Iterator<Item = PatTm> {
+        (1..=max_agents)
+            .flat_map(|n| self.model.agent_names().combinations_with_replacement(n))
+            .flat_map(|agents| self.find(agents))
+            .map(|tm| tm.take_pattern().unwrap_or_else(|| unreachable!()))
+    }
+
+    /// Generates transitions from the model up to a specified size.
+    ///
+    /// A *closed rule* is a derived rule with trivial interface. A *transition*
+    /// is an indecomposable closed rule, i.e., a closed rule that cannot be
+    /// expressed as a nontrivial composite or product of other closed rules.
+    pub fn transitions(&self, max_rules: usize) -> impl Iterator<Item = RuleTm> {
+        (1..=max_rules)
+            .flat_map(|n| {
+                chain(self.model.agent_names(), self.model.rule_names())
+                    .combinations_with_replacement(n)
+            })
+            .filter(|names| names.iter().any(|name| self.model.has_rule(name)))
+            .flat_map(|names| self.find(names))
+            .map(|tm| tm.take_rule().unwrap_or_else(|| unreachable!()))
+    }
+
+    fn find(&self, generator_names: Vec<Name>) -> Vec<ModelTm> {
+        // Collect all variables, then ensure they are unique.
+        let (mut generator_sorts, mut variables) = (Vec::new(), Vec::new());
+        for name in &generator_names {
+            let interface = self.model.interface(name).unwrap().collect_typed_vars();
+
+            // Degenerate case: if a generator's interface is empty, exit early
+            // since any non-trivial product with the generator is decomposable.
+            if interface.is_empty() {
+                return if generator_names.len() == 1 {
+                    vec![ModelTm::basic(self.model, *name, vec![]).unwrap()]
+                } else {
+                    vec![]
+                };
+            }
+
+            let (vars, sorts): (Vec<_>, Vec<_>) = interface.into_iter().unzip();
+            generator_sorts.push(sorts);
+            variables.extend(vars);
+        }
+        uniquify_names(&mut variables);
+
+        // Build initial term.
+        let mut terms = Vec::new();
+        let mut interface = Vec::new();
+        let mut variables = variables.into_iter();
+        for (i, (name, sorts)) in zip_eq(generator_names, generator_sorts).enumerate() {
+            let mut vars = Vec::new();
+            for sort in sorts {
+                let var = variables.next().unwrap();
+                interface.push(IntermediateVar { name: var, sort, component: i });
+                vars.push(MorTm::var(var));
+            }
+            terms.push(ModelTm::basic(self.model, name, vars).unwrap());
+        }
+        let n = terms.len();
+        let tm = if n == 1 {
+            terms.remove(0)
+        } else {
+            ModelTm::tensor(ModelTm::list(terms))
+        };
+
+        // Initialize the search state, then run the search.
+        let uf = Rc::new(QuickUnionUf::new(n));
+        let state = SearchState { tm, interface, uf, min_match_idx: 0 };
+        let mut results = Vec::new();
+        self.recurse(state, &mut results);
+        results
+    }
+
+    fn recurse(&self, state: SearchState, results: &mut Vec<ModelTm>) {
+        let SearchState { interface, tm, uf, min_match_idx } = state;
+
+        // Success condition: found a closed term.
+        if interface.is_empty() {
+            results.push(tm);
+            return;
+        }
+
+        for idxs in (0..interface.len()).powerset() {
+            // To avoid duplicate species, skip any subsets that do not include
+            // at least one index beyond the current minimum.
+            //
+            // As a special case, never restrict along co-nullary operations as
+            // that causes infinite blow-up. Such operations, which include
+            // [scalars](https://ncatlab.org/nlab/show/monoidal+category#scalars),
+            // also seem pointless, but perhaps they're good for something?
+            let min_match_idx = match idxs.iter().min() {
+                Some(&n) if n >= min_match_idx => n,
+                _ => {
+                    continue;
+                }
+            };
+
+            // Get co-applicable operations, bailing early if there are none.
+            let sorts = idxs.iter().map(|i| interface[*i].sort).collect_vec();
+            let Some(operations) = self.cod_index.get(&sorts).filter(|ops| !ops.is_empty()) else {
+                continue;
+            };
+
+            // Union components involved in restricting along these indices.
+            let mut uf = uf.clone();
+            let mut has_merged = false;
+            let mut components = idxs.iter().map(|i| interface[*i].component);
+            let first = components.next().unwrap();
+            for component in components {
+                if Rc::make_mut(&mut uf).union(first, component) {
+                    has_merged = true;
+                }
+            }
+            let component = if has_merged {
+                Rc::make_mut(&mut uf).find(first)
+            } else {
+                first
+            };
+
+            // Construct interface that remains after restricting along indices.
+            let interface_kept = interface
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &(mut var))| {
+                    if idxs.contains(&i) {
+                        return None;
+                    }
+                    if has_merged {
+                        var.component = Rc::make_mut(&mut uf).find(var.component);
+                    }
+                    Some(var)
+                })
+                .collect_vec();
+
+            // Restrict along each co-applicable operation and recurse.
+            for op in operations {
+                let (dom, cod) = self.model.signature().interface(op).unwrap();
+
+                let mut interface_added = dom
+                    .collect_sorts()
+                    .into_iter()
+                    .map(|sort| {
+                        let name = gen_var_with_sort(&sort);
+                        IntermediateVar { name, sort, component }
+                    })
+                    .collect_vec();
+
+                // If this component is being closed off but does not overlap
+                // with the (non-trivial) remaining interface, then any further
+                // pattern derived will be decomposable, so skip it.
+                if interface_added.is_empty()
+                    && !interface_kept.is_empty()
+                    && interface_kept.iter().all(|var| var.component != component)
+                {
+                    continue;
+                }
+
+                let restrict_at = if matches!(cod, Ty::Sort(_)) {
+                    let i = idxs.iter().exactly_one().unwrap();
+                    ObTm::var(interface[*i].name)
+                } else {
+                    let vars = idxs.iter().map(|i| ObTm::var(interface[*i].name));
+                    ObTm::tensor(ObTm::list(vars))
+                };
+
+                let args = MorTm::list(interface_added.iter().map(|var| MorTm::var(var.name)));
+                let restrict_along = MorTm::app(*op, args);
+
+                let mut interface = interface_kept.clone();
+                interface.append(&mut interface_added);
+                let state = SearchState {
+                    tm: tm.restrict(restrict_at, restrict_along),
+                    interface,
+                    uf: uf.clone(),
+                    min_match_idx,
+                };
+                self.recurse(state, results)
+            }
+        }
+    }
+}
+
+fn gen_var_with_sort(sort: &Name) -> Name {
+    gensym(&sort.to_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{toy_model_v1, toy_model_v2};
+    use expect_test::expect;
+
+    #[test]
+    fn toy_model_v1_generation() {
+        let model = toy_model_v1();
+        let species = expect![[r#"
+            A [unphos [], empty []]
+            A [phos [], empty []]
+            B [empty []]
+            K []
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], A [unphos [], s#2])
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], A [phos [], s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], A [unphos [], s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], A [phos [], s#2])
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (B [s#1], B [s#2])"#]];
+        species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
+    }
+
+    #[test]
+    fn toy_model_v2_generation() {
+        let model = toy_model_v2();
+        let species = expect![[r#"
+            A [unphos [], emptyA []]
+            A [phos [], emptyA []]
+            B [emptyB []]
+            K []
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])"#]];
+        species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
+
+        let rules = expect![[r#"
+            bondAB [unphos []]
+              : (A [unphos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
+            bondAB [phos []]
+              : (A [phos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
+            phosphorylate [emptyA []]
+              : (A [unphos [], emptyA []], K [])
+              → (A [phos [], emptyA []], K [])
+            let (s#1, s#2) = bond [] in (B [s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
+        rules.assert_eq(&NetGenerator::new(&model).transitions(2).join("\n"));
+    }
+}

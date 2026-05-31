@@ -1,5 +1,6 @@
 pub mod model;
 pub mod name;
+pub mod netgen;
 pub mod prelude;
 pub(crate) mod pretty;
 pub mod theory;
