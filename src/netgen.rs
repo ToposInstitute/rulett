@@ -319,13 +319,14 @@ fn gen_var_with_sort(sort: &Name) -> Name {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::model::{toy_model_v1, toy_model_v2};
+    use super::{super::model, *};
     use expect_test::expect;
 
     #[test]
-    fn toy_model_v1_generation() {
-        let model = toy_model_v1();
+    fn toy_model_v1() {
+        let model = model::toy_model_v1();
+        let generator = NetGenerator::new(&model);
+
         let species = expect![[r#"
             A [unphos [], empty []]
             A [phos [], empty []]
@@ -338,12 +339,40 @@ mod tests {
             let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
             let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])
             let (s#1, s#2) = bond [] in (B [s#1], B [s#2])"#]];
-        species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
+        species.assert_eq(&generator.species(2).join("\n"));
+
+        let transitions = expect![[r#"
+            bondAB [unphos []]
+              : (A [unphos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
+            bondAB [phos []]
+              : (A [phos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
+            phosphorylate [empty []]
+              : (A [unphos [], empty []], K [])
+              → (A [phos [], empty []], K [])
+            let (s#1, s#2) = bond [] in (A [unphos [], s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in (A [unphos [], s#1], (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in (A [unphos [], s#1], (A [phos [], s#2], K []))
+            let (s#1, s#2) = bond [] in (A [phos [], s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in (A [phos [], s#1], (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in (A [phos [], s#1], (A [phos [], s#2], K []))
+            let (s#1, s#2) = bond [] in (B [s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))
+            let (s#1, s#2) = bond [] in (phosphorylate [s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in
+                ((A [unphos [], s#1], K []), (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in
+                ((A [phos [], s#1], K []), (A [phos [], s#2], K []))"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
     }
 
     #[test]
-    fn toy_model_v2_generation() {
-        let model = toy_model_v2();
+    fn toy_model_v2() {
+        let model = model::toy_model_v2();
+        let generator = NetGenerator::new(&model);
+
         let species = expect![[r#"
             A [unphos [], emptyA []]
             A [phos [], emptyA []]
@@ -351,9 +380,9 @@ mod tests {
             K []
             let (s#1, s#2) = bond [] in (A [unphos [], s#1], B [s#2])
             let (s#1, s#2) = bond [] in (A [phos [], s#1], B [s#2])"#]];
-        species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
+        species.assert_eq(&generator.species(2).join("\n"));
 
-        let rules = expect![[r#"
+        let transitions = expect![[r#"
             bondAB [unphos []]
               : (A [unphos [], empty []], B [empty []])
               → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
@@ -366,6 +395,6 @@ mod tests {
             let (s#1, s#2) = bond [] in (B [s#1], phosphorylate [s#2])
               : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
               → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
-        rules.assert_eq(&NetGenerator::new(&model).transitions(2).join("\n"));
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
     }
 }
