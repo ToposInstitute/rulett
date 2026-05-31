@@ -5,9 +5,9 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["display"] }
 indexmap = "2.14.0"
 itertools = "0.14.0"
+pretty = "0.12"
 union-find = "0.4.4"
 ustr = "1.1.0"
 

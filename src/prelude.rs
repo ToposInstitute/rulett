@@ -5,3 +5,4 @@ pub use itertools::Itertools;
 pub use std::collections::{HashMap, HashSet};
 
 pub use super::name::*;
+pub(crate) use super::pretty::*;

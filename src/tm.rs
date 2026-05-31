@@ -1,6 +1,6 @@
 //! Terms for rule-based models.
 
-use derive_more::Display;
+use pretty::RcDoc;
 use std::fmt;
 
 use super::{prelude::*, ty::*};
@@ -29,14 +29,7 @@ pub enum ObTm {
 
 impl fmt::Display for ObTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ObTm::Var(name) => write!(f, "{name}"),
-            ObTm::List(terms) => write!(f, "[{}]", terms.iter().join(", ")),
-            ObTm::Tensor(tm) => match &**tm {
-                ObTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
-                _ => write!(f, "⊗ {tm}"),
-            },
-        }
+        render_doc(self.to_doc(), f)
     }
 }
 
@@ -53,6 +46,18 @@ impl<const N: usize> From<[ObTm; N]> for ObTm {
 }
 
 impl ObTm {
+    /// Pretty document for the object term.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        match self {
+            ObTm::Var(name) => RcDoc::text(name.as_str()),
+            ObTm::List(terms) => bracketed("[", "]", terms.iter().map(ObTm::to_doc)),
+            ObTm::Tensor(tm) => match &**tm {
+                ObTm::List(terms) => bracketed("(", ")", terms.iter().map(ObTm::to_doc)),
+                _ => RcDoc::text("⊗ ").append(tm.to_doc()),
+            },
+        }
+    }
+
     /// Smart constructor for [`Var`](Self::Var) variant.
     pub fn var(name: impl Into<Name>) -> Self {
         Self::Var(name.into())
@@ -217,18 +222,7 @@ pub enum MorTm {
 
 impl fmt::Display for MorTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MorTm::Var(name) => write!(f, "{name}"),
-            MorTm::List(terms) => write!(f, "[{}]", terms.iter().join(", ")),
-            MorTm::Tensor(tm) => match &**tm {
-                MorTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
-                _ => write!(f, "⊗ {tm}"),
-            },
-            MorTm::App(name, tm) => write!(f, "{name} {tm}"),
-            MorTm::Let { bindings, bound, body } => {
-                write!(f, "let {bindings} = {bound} in {body}")
-            }
-        }
+        render_doc(self.to_doc(), f)
     }
 }
 
@@ -245,6 +239,24 @@ impl<const N: usize> From<[MorTm; N]> for MorTm {
 }
 
 impl MorTm {
+    /// Pretty document for the term.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        match self {
+            MorTm::Var(name) => RcDoc::text(name.as_str()),
+            MorTm::List(terms) => bracketed("[", "]", terms.iter().map(MorTm::to_doc)),
+            MorTm::Tensor(tm) => match &**tm {
+                MorTm::List(terms) => bracketed("(", ")", terms.iter().map(MorTm::to_doc)),
+                _ => RcDoc::text("⊗ ").append(tm.to_doc()),
+            },
+            MorTm::App(name, tm) => {
+                RcDoc::text(name.as_str()).append(RcDoc::space()).append(tm.to_doc())
+            }
+            MorTm::Let { bindings, bound, body } => {
+                let_doc(bindings.to_doc(), bound.to_doc(), body.to_doc())
+            }
+        }
+    }
+
     /// Smart constructor for [`Var`](Self::Var) variant.
     pub fn var(name: impl Into<Name>) -> Self {
         Self::Var(name.into())
@@ -346,17 +358,7 @@ pub enum PatTm {
 
 impl fmt::Display for PatTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PatTm::Res(name, tm) => write!(f, "{name} {tm}"),
-            PatTm::List(patterns) => write!(f, "[{}]", patterns.iter().join(", ")),
-            PatTm::Tensor(tm) => match &**tm {
-                PatTm::List(terms) => write!(f, "({})", terms.iter().join(", ")),
-                _ => write!(f, "⊗ {tm}"),
-            },
-            PatTm::Let { bindings, bound, body } => {
-                write!(f, "let {bindings} = {bound} in {body}")
-            }
-        }
+        render_doc(self.to_doc(), f)
     }
 }
 
@@ -373,6 +375,23 @@ impl<const N: usize> From<[PatTm; N]> for PatTm {
 }
 
 impl PatTm {
+    /// Pretty document for the pattern term.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        match self {
+            PatTm::Res(name, tm) => {
+                RcDoc::text(name.as_str()).append(RcDoc::space()).append(tm.to_doc())
+            }
+            PatTm::List(patterns) => bracketed("[", "]", patterns.iter().map(PatTm::to_doc)),
+            PatTm::Tensor(tm) => match &**tm {
+                PatTm::List(terms) => bracketed("(", ")", terms.iter().map(PatTm::to_doc)),
+                _ => RcDoc::text("⊗ ").append(tm.to_doc()),
+            },
+            PatTm::Let { bindings, bound, body } => {
+                let_doc(bindings.to_doc(), bound.to_doc(), body.to_doc())
+            }
+        }
+    }
+
     /// Smart constructor for [`Res`](Self::Res) variant.
     pub fn res(name: impl Into<Name>, tm: impl Into<MorTm>) -> Self {
         Self::Res(name.into(), tm.into())
@@ -441,8 +460,7 @@ impl PatTm {
 ///
 /// A rule term represents an indexed morphism (derived rule) including its
 /// domain (left-hand side) and codomain (right-hand side).
-#[derive(Clone, PartialEq, Eq, Display)]
-#[display("{rule} : {lhs} → {rhs}")]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RuleTm {
     /// Term for rule itself.
     pub rule: PatTm,
@@ -452,7 +470,18 @@ pub struct RuleTm {
     pub rhs: PatTm,
 }
 
+impl fmt::Display for RuleTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        render_doc(self.to_doc(), f)
+    }
+}
+
 impl RuleTm {
+    /// Pretty document for the rule term.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        mor_doc(self.rule.to_doc(), self.lhs.to_doc(), self.rhs.to_doc())
+    }
+
     /// Constructs a list of rule terms.
     pub fn list(rules: Vec<RuleTm>) -> Self {
         let n = rules.len();

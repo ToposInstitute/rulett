@@ -1,6 +1,7 @@
 //! Rule-based models.
 
 use itertools::{chain, zip_eq};
+use pretty::RcDoc;
 use std::{fmt, rc::Rc};
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
@@ -188,12 +189,19 @@ impl fmt::Display for Model {
         writeln!(f, "#/ agents:")?;
         for (name, interface) in &self.agents {
             let ObTmJudgment { tm, ty } = interface;
-            writeln!(f, "{tm} : {ty} ⊢ {name} {tm}")?;
+            let head = RcDoc::text(name.as_str()).append(RcDoc::space()).append(tm.to_doc());
+            let doc = judgment_doc(tm.to_doc(), ty.to_doc(), head);
+            render_doc(doc, f)?;
+            writeln!(f)?;
         }
         writeln!(f, "#/ rules:")?;
         for (&name, BasicRuleData { interface, lhs, rhs }) in &self.rules {
             let ObTmJudgment { tm, ty } = interface;
-            writeln!(f, "{tm} : {ty} ⊢ {name} {tm} : {lhs} → {rhs}")?;
+            let head = RcDoc::text(name.as_str()).append(RcDoc::space()).append(tm.to_doc());
+            let rule = mor_doc(head, lhs.to_doc(), rhs.to_doc());
+            let doc = judgment_doc(tm.to_doc(), ty.to_doc(), rule);
+            render_doc(doc, f)?;
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -570,8 +578,12 @@ mod tests {
             [s] : [Site] ⊢ B [s]
             [] : [] ⊢ K []
             #/ rules:
-            [r] : [Res] ⊢ bondAB [r] : (A [r, empty []], B [empty []]) → let [s1, s2] = bond [] in (A [r, s1], B [s2])
-            [s] : [Site] ⊢ phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
+            [r] : [Res] ⊢
+              bondAB [r]
+                : (A [r, empty []], B [empty []])
+                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [Site] ⊢
+              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&model.to_string());
 
@@ -609,8 +621,12 @@ mod tests {
             [s] : [SiteB] ⊢ B [s]
             [] : [] ⊢ K []
             #/ rules:
-            [r] : [Res] ⊢ bondAB [r] : (A [r, empty []], B [empty []]) → let [s1, s2] = bond [] in (A [r, s1], B [s2])
-            [s] : [SiteA] ⊢ phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
+            [r] : [Res] ⊢
+              bondAB [r]
+                : (A [r, empty []], B [empty []])
+                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [SiteA] ⊢
+              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&model.to_string());
 
@@ -624,10 +640,18 @@ mod tests {
         species.assert_eq(&model.species(2).join("\n"));
 
         let rules = expect![[r#"
-            bondAB [unphos []] : (A [unphos [], empty []], B [empty []]) → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
-            bondAB [phos []] : (A [phos [], empty []], B [empty []]) → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
-            phosphorylate [emptyA []] : (A [unphos [], emptyA []], K []) → (A [phos [], emptyA []], K [])
-            let (s#1, s#2) = bond [] in (B [s#1], phosphorylate [s#2]) : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K [])) → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
+            bondAB [unphos []]
+              : (A [unphos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
+            bondAB [phos []]
+              : (A [phos [], empty []], B [empty []])
+              → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
+            phosphorylate [emptyA []]
+              : (A [unphos [], emptyA []], K [])
+              → (A [phos [], emptyA []], K [])
+            let (s#1, s#2) = bond [] in (B [s#1], phosphorylate [s#2])
+              : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
+              → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
         rules.assert_eq(&model.transitions(2).join("\n"));
     }
 }

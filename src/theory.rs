@@ -6,6 +6,7 @@
 //! monoidal categories, but starting with the multicategory structure leads to
 //! a more ergonomic type-theoretic notation.
 
+use pretty::RcDoc;
 use std::fmt;
 
 use super::{prelude::*, ty::*};
@@ -155,7 +156,9 @@ impl fmt::Display for Signature {
         }
         writeln!(f, "#/ operations:")?;
         for (op, dom, cod) in self.operations() {
-            writeln!(f, "{op} : {dom} → {cod}")?;
+            let doc = mor_doc(RcDoc::text(op.as_str()), dom.to_doc(), cod.to_doc());
+            render_doc(doc, f)?;
+            writeln!(f)?;
         }
         Ok(())
     }

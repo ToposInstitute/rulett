@@ -1,6 +1,7 @@
 //! Types for rule-based models.
 
-use derive_more::Display;
+use pretty::RcDoc;
+use std::fmt;
 
 use super::prelude::*;
 
@@ -8,19 +9,26 @@ use super::prelude::*;
 ///
 /// The (meta) type of a [type](Ty) is a kind. In double-categorical logic,
 /// kinds correspond to object types in the double theory.
-#[derive(Clone, PartialEq, Eq, Display)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Kind {
     /// The base or primitive kind, often denoted `*`.
-    #[display("*")]
     Prim,
 
     /// An application of the list constructor to a kind.
-    #[display("List {_0}")]
     List(Box<Kind>),
 
     /// A hole, representing an unknown kind.
-    #[display("?")]
     Hole,
+}
+
+impl fmt::Display for Kind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Kind::Prim => write!(f, "*"),
+            Kind::List(kind) => write!(f, "List {kind}"),
+            Kind::Hole => write!(f, "?"),
+        }
+    }
 }
 
 impl Kind {
@@ -56,19 +64,22 @@ impl Kind {
 ///
 /// In double-categorical logic, types correspond to objects in a model of the
 /// double theory.
-#[derive(Clone, PartialEq, Eq, Display)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Ty {
     /// A primitive type, aka a sort, belonging to the signature.
-    #[display("{_0}")]
     Sort(Name),
 
     /// A list of types, each of which should have the same kind.
-    #[display("[{}]", _0.iter().join(", "))]
     List(Vec<Ty>),
 
     /// An application of the tensor (`⊗: List(Prim) -> Prim`) to a type.
-    #[display("⊗ {_0}")]
     Tensor(Box<Ty>),
+}
+
+impl fmt::Display for Ty {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        render_doc(self.to_doc(), f)
+    }
 }
 
 impl FromIterator<Ty> for Ty {
@@ -84,6 +95,15 @@ impl<const N: usize> From<[Ty; N]> for Ty {
 }
 
 impl Ty {
+    /// Pretty document for the type.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        match self {
+            Ty::Sort(name) => RcDoc::text(name.as_str()),
+            Ty::List(types) => bracketed("[", "]", types.iter().map(Ty::to_doc)),
+            Ty::Tensor(ty) => RcDoc::text("⊗ ").append(ty.to_doc()),
+        }
+    }
+
     /// Smart constructor for [`Sort`](Self::Sort) variant.
     pub fn sort(name: impl Into<Name>) -> Self {
         Self::Sort(name.into())
