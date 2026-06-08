@@ -227,6 +227,13 @@ pub(crate) fn toy_model_v2() -> Model {
     Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
+/// A toy example of a ruled-based model (single agent).
+#[cfg(test)]
+pub(crate) fn toy_model_single_agent() -> Model {
+    let decls = model_decls_single_agent();
+    Model::parse(toy_signature_single_agent(), decls).unwrap()
+}
+
 #[cfg(test)]
 fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
     [
@@ -265,6 +272,90 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
             PatTm::tensor([
                 PatTm::res("A", [MorTm::app("phos", []), MorTm::var("s")]),
                 PatTm::res("K", []),
+            ]),
+        ),
+    ]
+}
+
+/// A toy example of a ruled-based model (variant 2).
+// #[cfg(test)]
+// pub(crate) fn toy_model_v3() -> Model {
+//     let decls = single_agent_model_decls();
+//     Model::parse(toy_signature_v2(), decls).unwrap()
+// }
+
+#[cfg(test)]
+fn model_decls_single_agent() -> [ModelDecl; 3] {
+    let ReA = PatTm::res("M", MorTm::var("iota_A"));
+    let ReB = PatTm::res("M", MorTm::var("iota_B"));
+    let ReK = PatTm::res("M", MorTm::var("iota_K"));
+
+    let SiteA = PatTm::res("M", MorTm::var("iota_SiteA"));
+    let SiteB = PatTm::res("M", MorTm::var("iota_SiteB"));
+    let Res = PatTm::res("M", MorTm::var("iota_Res"));
+
+    let A = PatTm::tensor([ReA, SiteB, Res]);
+    let B = PatTm::tensor([ReB, SiteA]);
+    let K = PatTm::tensor([ReK]);
+
+    // The next three lines do a bit what the profunctor would do. @Evan, do we need this for now?
+    let A = A.subst(&mut vec![(name("iota_A"), MorTm::app("iota_A", MorTm::app("ground_A", [])))]);
+    let B = B.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("ground_B", [])))]);
+    let K = K.subst(&mut vec![(name("iota_K"), MorTm::app("iota_K", MorTm::app("ground_K", [])))]);
+
+    let A_phos =
+        A.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("phos", [])))]);
+    let A_unphos =
+        A.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("unphos", [])))]);
+
+    let A_free = A.subst(&mut vec![(
+        name("iota_SiteB"),
+        MorTm::app("iota_SiteB", MorTm::app("empty", [])),
+    )]);
+    let B_free = B.subst(&mut vec![(
+        name("iota_SiteA"),
+        MorTm::app("iota_SiteA", MorTm::app("empty", [])),
+    )]);
+    let AB = PatTm::tensor([A, B]);
+    let AB_complex = AB.subst(&mut vec![
+        (name("iota_SiteA"), MorTm::app("iota_SiteA", MorTm::app("s1", []))),
+        (name("iota_SiteB"), MorTm::app("iota_SiteB", MorTm::app("s2", []))),
+    ]);
+    let AB_complex =
+        PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), AB_complex); // TODO: ask Evan how to do this
+    [
+        ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
+        ModelDecl::rule(
+            "bondAB",
+            [ObTm::var("r")],
+            [Ty::sort("Res")],
+            PatTm::tensor([
+                A_free.subst(&mut vec![(
+                    name("iota_Res"),
+                    MorTm::app("iota_Res", MorTm::app("r", [])),
+                )]), // @Evan: I believe the substitution here is required to introduce the variable "r"
+                B_free,
+            ]),
+            AB_complex
+                .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("r", [])))]),
+        ),
+        ModelDecl::rule(
+            "phosphorylate",
+            [ObTm::var("s")],
+            [Ty::sort("SiteB")],
+            PatTm::tensor([
+                A_unphos.subst(&mut vec![(
+                    name("iota_SiteB"),
+                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                )]),
+                K.clone(),
+            ]), // @Evan: what do you think of the requirement to clone here?
+            PatTm::tensor([
+                A_phos.subst(&mut vec![(
+                    name("iota_SiteB"),
+                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                )]),
+                K,
             ]),
         ),
     ]
@@ -324,5 +415,58 @@ mod tests {
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&toy_model_v2().to_string());
+
+        let s = &toy_model_single_agent().to_string();
+        println!("{s}");
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_B : [] → ReB
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            #/ agents:
+            [m] : [ReMonomer] ⊢ M [m]
+            #/ rules:
+            [r] : [Res] ⊢
+              bondAB [r]
+                : (
+                  (M iota_A ground_A [], M iota_SiteB empty [], M iota_Res r []),
+                  (M iota_B ground_B [], M iota_SiteA empty [])
+                )
+                → let [s1, s2] = bond [] in
+                  (
+                    (M iota_A ground_A [], M iota_SiteB s2 [], M iota_Res r []),
+                    (M iota_B ground_B [], M iota_SiteA s1 [])
+                  )
+            [s] : [SiteB] ⊢
+              phosphorylate [s]
+                : (
+                  (M iota_A ground_A [], M iota_SiteB s [], M iota_Res unphos []),
+                  (M iota_K ground_K [])
+                )
+                → (
+                  (M iota_A ground_A [], M iota_SiteB s [], M iota_Res phos []),
+                  (M iota_K ground_K [])
+                )
+        "#]];
+        expected.assert_eq(&toy_model_single_agent().to_string());
     }
 }

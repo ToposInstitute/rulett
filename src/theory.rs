@@ -193,6 +193,35 @@ pub(crate) fn toy_signature_v2() -> Signature {
     .unwrap()
 }
 
+/// Signature for a toy model (single agent).
+#[cfg(test)]
+pub(crate) fn toy_signature_single_agent() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("ReMonomer"),
+        SignatureDecl::sort("ReA"),
+        SignatureDecl::sort("ReB"),
+        SignatureDecl::sort("ReK"),
+        SignatureDecl::sort("SiteA"),
+        SignatureDecl::sort("SiteB"),
+        SignatureDecl::sort("Res"),
+        SignatureDecl::operation("iota_A", [Ty::sort("ReA")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_B", [Ty::sort("ReB")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_K", [Ty::sort("ReK")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_SiteA", [Ty::sort("SiteA")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_SiteB", [Ty::sort("SiteB")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_Res", [Ty::sort("Res")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("phos", [], Ty::sort("Res")),
+        SignatureDecl::operation("unphos", [], Ty::sort("Res")),
+        SignatureDecl::operation("ground_A", [], Ty::sort("ReA")),
+        SignatureDecl::operation("ground_B", [], Ty::sort("ReB")),
+        SignatureDecl::operation("ground_K", [], Ty::sort("ReK")),
+        SignatureDecl::operation("emptyA", [], Ty::sort("SiteA")),
+        SignatureDecl::operation("emptyB", [], Ty::sort("SiteB")),
+        SignatureDecl::operation("bond", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
+    ])
+    .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
