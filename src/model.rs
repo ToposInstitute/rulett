@@ -273,97 +273,123 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use expect_test::expect;
     use crate::netgen::*;
+    use expect_test::expect;
 
     /// NaH, CH3Na, CH4, H2, NaF, NaCl, CH3CH3, CH3F, CH3Cl, F2, FCl, ClF (Distinct!!!), Cl2,
     #[test]
     fn chem() {
-    let sig = Signature::parse([
-        SignatureDecl::sort("Pos"),
-        SignatureDecl::sort("Neg"),
-        SignatureDecl::sort("Rad"),
-        SignatureDecl::sort("TyHalo"),
-        SignatureDecl::operation("F", [], Ty::sort("TyHalo")),
-        SignatureDecl::operation("Cl", [], Ty::sort("TyHalo")),
-        SignatureDecl::operation("bond_i", [], Ty::tensor([Ty::sort("Pos"), Ty::sort("Neg")])),
-        SignatureDecl::operation("bond_c", [], Ty::tensor([Ty::sort("Rad"), Ty::sort("Rad")])),
-    ])
-    .unwrap();
+        let sig = Signature::parse([
+            SignatureDecl::sort("Pos"),
+            SignatureDecl::sort("Neg"),
+            SignatureDecl::sort("Rad"),
+            SignatureDecl::sort("TyHalo"),
+            SignatureDecl::operation("F", [], Ty::sort("TyHalo")),
+            SignatureDecl::operation("Cl", [], Ty::sort("TyHalo")),
+            SignatureDecl::operation("bond_i", [], Ty::tensor([Ty::sort("Pos"), Ty::sort("Neg")])),
+            SignatureDecl::operation("bond_c", [], Ty::tensor([Ty::sort("Rad"), Ty::sort("Rad")])),
+        ])
+        .unwrap();
 
-    let decls=    [
-        ModelDecl::agent(
-            "Na",
-            [ObTm::var("p")],
-            [Ty::sort("Pos")],
-        ),
-        ModelDecl::agent(
-            "H_minus",
-            [ObTm::var("n")],
-            [Ty::sort("Neg")],
-        ),
-        ModelDecl::agent(
-            "H_dot",
-            [ObTm::var("r")],
-            [Ty::sort("Rad")],
-        ),
-        ModelDecl::agent(
-            "CH3_minus",
-            [ObTm::var("n")],
-            [Ty::sort("Neg")],
-        ),
-        ModelDecl::agent(
-            "CH3_dot",
-            [ObTm::var("r")],
-            [Ty::sort("Rad")],
-        ),
-        ModelDecl::agent(
-            "Halo_neg",
-            [ObTm::var("n"),ObTm::var("h")],
-            [Ty::sort("Neg"),Ty::sort("TyHalo")],
-        ),
-        ModelDecl::agent(
-            "Halo_dot",
-            [ObTm::var("r"),ObTm::var("h")],
-            [Ty::sort("Rad"),Ty::sort("TyHalo")],
-        ),
-
-        ModelDecl::rule(
-            "rule1",
-            [ObTm::var("h1"),ObTm::var("h2")],
-            [Ty::sort("TyHalo"),Ty::sort("TyHalo")],
-            PatTm::tensor([PatTm::let_(
-                [ObTm::var("r1"), ObTm::var("r2")],
-                MorTm::app("bond_c", []),
+        let decls = [
+            ModelDecl::agent("Na", [ObTm::var("p")], [Ty::sort("Pos")]),
+            ModelDecl::agent("H_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+            ModelDecl::agent("H_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+            ModelDecl::agent("CH3_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+            ModelDecl::agent("CH3_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+            ModelDecl::agent(
+                "Halo_neg",
+                [ObTm::var("n"), ObTm::var("h")],
+                [Ty::sort("Neg"), Ty::sort("TyHalo")],
+            ),
+            ModelDecl::agent(
+                "Halo_dot",
+                [ObTm::var("r"), ObTm::var("h")],
+                [Ty::sort("Rad"), Ty::sort("TyHalo")],
+            ),
+            ModelDecl::rule(
+                "rule1",
+                [ObTm::var("h1"), ObTm::var("h2")],
+                [Ty::sort("TyHalo"), Ty::sort("TyHalo")],
                 PatTm::tensor([
-                    PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                    PatTm::res("Halo_dot", [MorTm::var("r2"),MorTm::var("h1")]),
+                    PatTm::let_(
+                        [ObTm::var("r1"), ObTm::var("r2")],
+                        MorTm::app("bond_c", []),
+                        PatTm::tensor([
+                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                        ]),
+                    ),
+                    PatTm::let_(
+                        [ObTm::var("p"), ObTm::var("n")],
+                        MorTm::app("bond_i", []),
+                        PatTm::tensor([
+                            PatTm::res("Na", [MorTm::var("p")]),
+                            PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h2")]),
+                        ]),
+                    ),
                 ]),
-            ),PatTm::let_(
-                [ObTm::var("p"), ObTm::var("n")],
-                MorTm::app("bond_i", []),
                 PatTm::tensor([
-                    PatTm::res("Na", [MorTm::var("p")]),
-                    PatTm::res("Halo_dot", [MorTm::var("n"),MorTm::var("h2")]),
+                    PatTm::let_(
+                        [ObTm::var("r1"), ObTm::var("r2")],
+                        MorTm::app("bond_c", []),
+                        PatTm::tensor([
+                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h2")]),
+                        ]),
+                    ),
+                    PatTm::let_(
+                        [ObTm::var("p"), ObTm::var("n")],
+                        MorTm::app("bond_i", []),
+                        PatTm::tensor([
+                            PatTm::res("Na", [MorTm::var("p")]),
+                            PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h1")]),
+                        ]),
+                    ),
                 ]),
-            )
-            ]),PatTm::tensor([PatTm::let_(
-                [ObTm::var("r1"), ObTm::var("r2")],
-                MorTm::app("bond_c", []),
+            ),
+            ModelDecl::rule(
+                "rule2",
+                [ObTm::var("h1")],
+                [Ty::sort("TyHalo")],
                 PatTm::tensor([
-                    PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                    PatTm::res("Halo_dot", [MorTm::var("r2"),MorTm::var("h2")]),
+                    PatTm::let_(
+                        [ObTm::var("r1"), ObTm::var("r2")],
+                        MorTm::app("bond_c", []),
+                        PatTm::tensor([
+                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                        ]),
+                    ),
+                    PatTm::let_(
+                        [ObTm::var("p"), ObTm::var("n")],
+                        MorTm::app("bond_i", []),
+                        PatTm::tensor([
+                            PatTm::res("Na", [MorTm::var("p")]),
+                            PatTm::res("H_minus", [MorTm::var("n")]),
+                        ]),
+                    ),
                 ]),
-            ),PatTm::let_(
-                [ObTm::var("p"), ObTm::var("n")],
-                MorTm::app("bond_i", []),
                 PatTm::tensor([
-                    PatTm::res("Na", [MorTm::var("p")]),
-                    PatTm::res("Halo_dot", [MorTm::var("n"),MorTm::var("h1")]),
+                    PatTm::let_(
+                        [ObTm::var("r1"), ObTm::var("r2")],
+                        MorTm::app("bond_c", []),
+                        PatTm::tensor([
+                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                            PatTm::res("H_dot", [MorTm::var("r2")]),
+                        ]),
+                    ),
+                    PatTm::let_(
+                        [ObTm::var("p"), ObTm::var("n")],
+                        MorTm::app("bond_i", []),
+                        PatTm::tensor([
+                            PatTm::res("Na", [MorTm::var("p")]),
+                            PatTm::res("Halo_minus", [MorTm::var("n")]),
+                        ]),
+                    ),
                 ]),
-            )
-            ])
-        )];
+            ),
+        ];
 
         let model = Model::parse(sig, decls).unwrap();
 
@@ -397,22 +423,27 @@ mod tests {
                   let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, h2]),
                   let [p, n] = bond_i [] in (Na [p], Halo_dot [n, h1])
                 )
+            [h1] : [TyHalo] ⊢
+              rule2 [h1]
+                : (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, h1]),
+                  let [p, n] = bond_i [] in (Na [p], H_minus [n])
+                )
+                → (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], H_dot [r2]),
+                  let [p, n] = bond_i [] in (Na [p], Halo_minus [n])
+                )
         "#]];
-                
 
-    expected.assert_eq(&model.to_string());
+        expected.assert_eq(&model.to_string());
 
-    let generator = NetGenerator::new(&model);
-    let res = generator.species(2).join("\n");
-    println!("{res}");
+        let generator = NetGenerator::new(&model);
+        let res = generator.species(2).join("\n");
+        println!("{res}");
 
-    let res = generator.transitions(2).join("\n");
-    println!("{res}");
-
-
-    
+        let res = generator.transitions(2).join("\n");
+        println!("{res}");
     }
-
 
     #[test]
     fn parse() {
