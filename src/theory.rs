@@ -193,6 +193,22 @@ pub(crate) fn toy_signature_v2() -> Signature {
     .unwrap()
 }
 
+/// Signature for a toy model (chemistry).
+#[cfg(test)]
+pub(crate) fn toy_signature_chem() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("Pos"),
+        SignatureDecl::sort("Neg"),
+        SignatureDecl::sort("Rad"),
+        SignatureDecl::sort("TyHalo"),
+        SignatureDecl::operation("F", [], Ty::sort("TyHalo")),
+        SignatureDecl::operation("Cl", [], Ty::sort("TyHalo")),
+        SignatureDecl::operation("bond_i", [], Ty::tensor([Ty::sort("Pos"), Ty::sort("Neg")])),
+        SignatureDecl::operation("bond_c", [], Ty::tensor([Ty::sort("Rad"), Ty::sort("Rad")])),
+    ])
+    .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,5 +241,19 @@ mod tests {
             bond : [] → ⊗ [SiteA, SiteB]
         "#]];
         expected.assert_eq(&toy_signature_v2().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Pos
+            Neg
+            Rad
+            TyHalo
+            #/ operations:
+            F : [] → TyHalo
+            Cl : [] → TyHalo
+            bond_i : [] → ⊗ [Pos, Neg]
+            bond_c : [] → ⊗ [Rad, Rad]
+        "#]];
+        expected.assert_eq(&toy_signature_chem().to_string());
     }
 }

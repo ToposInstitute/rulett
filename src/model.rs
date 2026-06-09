@@ -228,6 +228,12 @@ pub(crate) fn toy_model_v2() -> Model {
 }
 
 #[cfg(test)]
+pub(crate) fn toy_model_chem() -> Model {
+    let decls = toy_model_chem_decls();
+    Model::parse(toy_signature_chem(), decls).unwrap()
+}
+
+#[cfg(test)]
 fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
     [
         ModelDecl::agent(
@@ -271,12 +277,116 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
 }
 
 #[cfg(test)]
+fn toy_model_chem_decls() -> [ModelDecl; 9] {
+    [
+        ModelDecl::agent("Na", [ObTm::var("p")], [Ty::sort("Pos")]),
+        ModelDecl::agent("H_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+        ModelDecl::agent("H_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+        ModelDecl::agent("CH3_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+        ModelDecl::agent("CH3_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+        ModelDecl::agent(
+            "Halo_neg",
+            [ObTm::var("n"), ObTm::var("h")],
+            [Ty::sort("Neg"), Ty::sort("TyHalo")],
+        ),
+        ModelDecl::agent(
+            "Halo_dot",
+            [ObTm::var("r"), ObTm::var("h")],
+            [Ty::sort("Rad"), Ty::sort("TyHalo")],
+        ),
+        ModelDecl::rule(
+            "rule1",
+            [ObTm::var("h1"), ObTm::var("h2")],
+            [Ty::sort("TyHalo"), Ty::sort("TyHalo")],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h2")]),
+                    ]),
+                ),
+            ]),
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h2")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h1")]),
+                    ]),
+                ),
+            ]),
+        ),
+        ModelDecl::rule(
+            "rule2",
+            [ObTm::var("h1")],
+            [Ty::sort("TyHalo")],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("H_minus", [MorTm::var("n")]),
+                    ]),
+                ),
+            ]),
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("H_dot", [MorTm::var("r2")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_minus", [MorTm::var("n")]),
+                    ]),
+                ),
+            ]),
+        ),
+    ]
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use expect_test::expect;
 
     #[test]
     fn parse() {
+        // toy_model_v1
         let expected = expect![[r#"
             #/ sorts:
             Res
@@ -300,6 +410,7 @@ mod tests {
         "#]];
         expected.assert_eq(&toy_model_v1().to_string());
 
+        // toy_model_v2
         let expected = expect![[r#"
             #/ sorts:
             Res
@@ -324,5 +435,49 @@ mod tests {
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&toy_model_v2().to_string());
+
+        // toy_model_chem
+        let expected = expect![[r#"
+            #/ sorts:
+            Pos
+            Neg
+            Rad
+            TyHalo
+            #/ operations:
+            F : [] → TyHalo
+            Cl : [] → TyHalo
+            bond_i : [] → ⊗ [Pos, Neg]
+            bond_c : [] → ⊗ [Rad, Rad]
+            #/ agents:
+            [p] : [Pos] ⊢ Na [p]
+            [n] : [Neg] ⊢ H_minus [n]
+            [r] : [Rad] ⊢ H_dot [r]
+            [n] : [Neg] ⊢ CH3_minus [n]
+            [r] : [Rad] ⊢ CH3_dot [r]
+            [n, h] : [Neg, TyHalo] ⊢ Halo_neg [n, h]
+            [r, h] : [Rad, TyHalo] ⊢ Halo_dot [r, h]
+            #/ rules:
+            [h1, h2] : [TyHalo, TyHalo] ⊢
+              rule1 [h1, h2]
+                : (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, h1]),
+                  let [p, n] = bond_i [] in (Na [p], Halo_dot [n, h2])
+                )
+                → (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, h2]),
+                  let [p, n] = bond_i [] in (Na [p], Halo_dot [n, h1])
+                )
+            [h1] : [TyHalo] ⊢
+              rule2 [h1]
+                : (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, h1]),
+                  let [p, n] = bond_i [] in (Na [p], H_minus [n])
+                )
+                → (
+                  let [r1, r2] = bond_c [] in (CH3_dot [r1], H_dot [r2]),
+                  let [p, n] = bond_i [] in (Na [p], Halo_minus [n])
+                )
+        "#]];
+        expected.assert_eq(&toy_model_chem().to_string());
     }
 }
