@@ -397,4 +397,95 @@ mod tests {
               → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
     }
+
+    #[test]
+    fn toy_model_chem() {
+        let model = model::toy_model_chem();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            let (p, n) = bond_i [] in (Na [p], H_minus [n])
+            let (p, n) = bond_i [] in (Na [p], CH3_minus [n])
+            let (p, n) = bond_i [] in (Na [p], Halo_neg [n, F []])
+            let (p, n) = bond_i [] in (Na [p], Halo_neg [n, Cl []])
+            let (r#1, r#2) = bond_c [] in (H_dot [r#1], H_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (H_dot [r#1], CH3_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (H_dot [r#1], Halo_dot [r#2, F []])
+            let (r#1, r#2) = bond_c [] in (H_dot [r#1], Halo_dot [r#2, Cl []])
+            let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], CH3_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], Halo_dot [r#2, F []])
+            let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], Halo_dot [r#2, Cl []])
+            let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], H_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], Halo_dot [r#2, F []])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], Halo_dot [r#2, Cl []])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], H_dot [r#2,])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], CH3_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, F []])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, Cl []])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], H_dot [r#2])
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], CH3_dot [r#2])"#]];
+        // H_dot, CH3
+        for x in generator.species(3) {
+            println!("{x}");
+        }
+        species.assert_eq(&generator.species(2).join("\n"));
+
+        // TODO: ignore symmetric rules
+        let transitions = expect![[r#"
+            rule1 [F [], F []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, F []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, F []])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, F []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, F []])
+              )
+            rule1 [F [], Cl []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, F []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, Cl []])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, Cl []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, F []])
+              )
+            rule1 [Cl [], F []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, Cl []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, F []])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, F []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, Cl []])
+              )
+            rule1 [Cl [], Cl []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, Cl []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, Cl []])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, Cl []]),
+                let [p, n] = bond_i [] in (Na [p], Halo_dot [n, Cl []])
+              )
+            rule2 [F []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, F []]),
+                let [p, n] = bond_i [] in (Na [p], H_minus [n])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], H_dot [r2]),
+                let [p, n] = bond_i [] in (Na [p], Halo_minus [n])
+              )
+            rule2 [Cl []]
+              : (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], Halo_dot [r2, Cl []]),
+                let [p, n] = bond_i [] in (Na [p], H_minus [n])
+              )
+              → (
+                let [r1, r2] = bond_c [] in (CH3_dot [r1], H_dot [r2]),
+                let [p, n] = bond_i [] in (Na [p], Halo_minus [n])
+              )"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
+    }
 }

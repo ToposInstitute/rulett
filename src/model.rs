@@ -228,6 +228,12 @@ pub(crate) fn toy_model_v2() -> Model {
 }
 
 #[cfg(test)]
+pub(crate) fn toy_model_chem() -> Model {
+    let decls = toy_model_chem_decls();
+    Model::parse(toy_signature_chem(), decls).unwrap()
+}
+
+#[cfg(test)]
 fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
     [
         ModelDecl::agent(
@@ -271,128 +277,166 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
 }
 
 #[cfg(test)]
+fn toy_model_chem_decls() -> [ModelDecl; 9] {
+    [
+        ModelDecl::agent("Na", [ObTm::var("p")], [Ty::sort("Pos")]),
+        ModelDecl::agent("H_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+        ModelDecl::agent("H_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+        ModelDecl::agent("CH3_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
+        ModelDecl::agent("CH3_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
+        ModelDecl::agent(
+            "Halo_neg",
+            [ObTm::var("n"), ObTm::var("h")],
+            [Ty::sort("Neg"), Ty::sort("TyHalo")],
+        ),
+        ModelDecl::agent(
+            "Halo_dot",
+            [ObTm::var("r"), ObTm::var("h")],
+            [Ty::sort("Rad"), Ty::sort("TyHalo")],
+        ),
+        ModelDecl::rule(
+            "rule1",
+            [ObTm::var("h1"), ObTm::var("h2")],
+            [Ty::sort("TyHalo"), Ty::sort("TyHalo")],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h2")]),
+                    ]),
+                ),
+            ]),
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h2")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h1")]),
+                    ]),
+                ),
+            ]),
+        ),
+        ModelDecl::rule(
+            "rule2",
+            [ObTm::var("h1")],
+            [Ty::sort("TyHalo")],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("H_minus", [MorTm::var("n")]),
+                    ]),
+                ),
+            ]),
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("r1"), ObTm::var("r2")],
+                    MorTm::app("bond_c", []),
+                    PatTm::tensor([
+                        PatTm::res("CH3_dot", [MorTm::var("r1")]),
+                        PatTm::res("H_dot", [MorTm::var("r2")]),
+                    ]),
+                ),
+                PatTm::let_(
+                    [ObTm::var("p"), ObTm::var("n")],
+                    MorTm::app("bond_i", []),
+                    PatTm::tensor([
+                        PatTm::res("Na", [MorTm::var("p")]),
+                        PatTm::res("Halo_minus", [MorTm::var("n")]),
+                    ]),
+                ),
+            ]),
+        ),
+    ]
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::netgen::*;
     use expect_test::expect;
 
-    /// NaH, CH3Na, CH4, H2, NaF, NaCl, CH3CH3, CH3F, CH3Cl, F2, FCl, ClF (Distinct!!!), Cl2,
     #[test]
-    fn chem() {
-        let sig = Signature::parse([
-            SignatureDecl::sort("Pos"),
-            SignatureDecl::sort("Neg"),
-            SignatureDecl::sort("Rad"),
-            SignatureDecl::sort("TyHalo"),
-            SignatureDecl::operation("F", [], Ty::sort("TyHalo")),
-            SignatureDecl::operation("Cl", [], Ty::sort("TyHalo")),
-            SignatureDecl::operation("bond_i", [], Ty::tensor([Ty::sort("Pos"), Ty::sort("Neg")])),
-            SignatureDecl::operation("bond_c", [], Ty::tensor([Ty::sort("Rad"), Ty::sort("Rad")])),
-        ])
-        .unwrap();
+    fn parse() {
+        // toy_model_v1
+        let expected = expect![[r#"
+            #/ sorts:
+            Res
+            Site
+            #/ operations:
+            unphos : [] → Res
+            phos : [] → Res
+            empty : [] → Site
+            bond : [] → ⊗ [Site, Site]
+            #/ agents:
+            [r, s] : [Res, Site] ⊢ A [r, s]
+            [s] : [Site] ⊢ B [s]
+            [] : [] ⊢ K []
+            #/ rules:
+            [r] : [Res] ⊢
+              bondAB [r]
+                : (A [r, empty []], B [empty []])
+                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [Site] ⊢
+              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
+        "#]];
+        expected.assert_eq(&toy_model_v1().to_string());
 
-        let decls = [
-            ModelDecl::agent("Na", [ObTm::var("p")], [Ty::sort("Pos")]),
-            ModelDecl::agent("H_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
-            ModelDecl::agent("H_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
-            ModelDecl::agent("CH3_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
-            ModelDecl::agent("CH3_dot", [ObTm::var("r")], [Ty::sort("Rad")]),
-            ModelDecl::agent(
-                "Halo_neg",
-                [ObTm::var("n"), ObTm::var("h")],
-                [Ty::sort("Neg"), Ty::sort("TyHalo")],
-            ),
-            ModelDecl::agent(
-                "Halo_dot",
-                [ObTm::var("r"), ObTm::var("h")],
-                [Ty::sort("Rad"), Ty::sort("TyHalo")],
-            ),
-            ModelDecl::rule(
-                "rule1",
-                [ObTm::var("h1"), ObTm::var("h2")],
-                [Ty::sort("TyHalo"), Ty::sort("TyHalo")],
-                PatTm::tensor([
-                    PatTm::let_(
-                        [ObTm::var("r1"), ObTm::var("r2")],
-                        MorTm::app("bond_c", []),
-                        PatTm::tensor([
-                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
-                        ]),
-                    ),
-                    PatTm::let_(
-                        [ObTm::var("p"), ObTm::var("n")],
-                        MorTm::app("bond_i", []),
-                        PatTm::tensor([
-                            PatTm::res("Na", [MorTm::var("p")]),
-                            PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h2")]),
-                        ]),
-                    ),
-                ]),
-                PatTm::tensor([
-                    PatTm::let_(
-                        [ObTm::var("r1"), ObTm::var("r2")],
-                        MorTm::app("bond_c", []),
-                        PatTm::tensor([
-                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h2")]),
-                        ]),
-                    ),
-                    PatTm::let_(
-                        [ObTm::var("p"), ObTm::var("n")],
-                        MorTm::app("bond_i", []),
-                        PatTm::tensor([
-                            PatTm::res("Na", [MorTm::var("p")]),
-                            PatTm::res("Halo_dot", [MorTm::var("n"), MorTm::var("h1")]),
-                        ]),
-                    ),
-                ]),
-            ),
-            ModelDecl::rule(
-                "rule2",
-                [ObTm::var("h1")],
-                [Ty::sort("TyHalo")],
-                PatTm::tensor([
-                    PatTm::let_(
-                        [ObTm::var("r1"), ObTm::var("r2")],
-                        MorTm::app("bond_c", []),
-                        PatTm::tensor([
-                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                            PatTm::res("Halo_dot", [MorTm::var("r2"), MorTm::var("h1")]),
-                        ]),
-                    ),
-                    PatTm::let_(
-                        [ObTm::var("p"), ObTm::var("n")],
-                        MorTm::app("bond_i", []),
-                        PatTm::tensor([
-                            PatTm::res("Na", [MorTm::var("p")]),
-                            PatTm::res("H_minus", [MorTm::var("n")]),
-                        ]),
-                    ),
-                ]),
-                PatTm::tensor([
-                    PatTm::let_(
-                        [ObTm::var("r1"), ObTm::var("r2")],
-                        MorTm::app("bond_c", []),
-                        PatTm::tensor([
-                            PatTm::res("CH3_dot", [MorTm::var("r1")]),
-                            PatTm::res("H_dot", [MorTm::var("r2")]),
-                        ]),
-                    ),
-                    PatTm::let_(
-                        [ObTm::var("p"), ObTm::var("n")],
-                        MorTm::app("bond_i", []),
-                        PatTm::tensor([
-                            PatTm::res("Na", [MorTm::var("p")]),
-                            PatTm::res("Halo_minus", [MorTm::var("n")]),
-                        ]),
-                    ),
-                ]),
-            ),
-        ];
+        // toy_model_v2
+        let expected = expect![[r#"
+            #/ sorts:
+            Res
+            SiteA
+            SiteB
+            #/ operations:
+            unphos : [] → Res
+            phos : [] → Res
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            #/ agents:
+            [r, s] : [Res, SiteA] ⊢ A [r, s]
+            [s] : [SiteB] ⊢ B [s]
+            [] : [] ⊢ K []
+            #/ rules:
+            [r] : [Res] ⊢
+              bondAB [r]
+                : (A [r, empty []], B [empty []])
+                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+            [s] : [SiteA] ⊢
+              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
+        "#]];
+        expected.assert_eq(&toy_model_v2().to_string());
 
-        let model = Model::parse(sig, decls).unwrap();
-
+        // toy_model_chem
         let expected = expect![[r#"
             #/ sorts:
             Pos
@@ -434,65 +478,6 @@ mod tests {
                   let [p, n] = bond_i [] in (Na [p], Halo_minus [n])
                 )
         "#]];
-
-        expected.assert_eq(&model.to_string());
-
-        let generator = NetGenerator::new(&model);
-        let res = generator.species(2).join("\n");
-        println!("{res}");
-
-        let res = generator.transitions(2).join("\n");
-        println!("{res}");
-    }
-
-    #[test]
-    fn parse() {
-        let expected = expect![[r#"
-            #/ sorts:
-            Res
-            Site
-            #/ operations:
-            unphos : [] → Res
-            phos : [] → Res
-            empty : [] → Site
-            bond : [] → ⊗ [Site, Site]
-            #/ agents:
-            [r, s] : [Res, Site] ⊢ A [r, s]
-            [s] : [Site] ⊢ B [s]
-            [] : [] ⊢ K []
-            #/ rules:
-            [r] : [Res] ⊢
-              bondAB [r]
-                : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
-            [s] : [Site] ⊢
-              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
-        "#]];
-        expected.assert_eq(&toy_model_v1().to_string());
-
-        let expected = expect![[r#"
-            #/ sorts:
-            Res
-            SiteA
-            SiteB
-            #/ operations:
-            unphos : [] → Res
-            phos : [] → Res
-            emptyA : [] → SiteA
-            emptyB : [] → SiteB
-            bond : [] → ⊗ [SiteA, SiteB]
-            #/ agents:
-            [r, s] : [Res, SiteA] ⊢ A [r, s]
-            [s] : [SiteB] ⊢ B [s]
-            [] : [] ⊢ K []
-            #/ rules:
-            [r] : [Res] ⊢
-              bondAB [r]
-                : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
-            [s] : [SiteA] ⊢
-              phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
-        "#]];
-        expected.assert_eq(&toy_model_v2().to_string());
+        expected.assert_eq(&toy_model_chem().to_string());
     }
 }
