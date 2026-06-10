@@ -222,6 +222,24 @@ pub(crate) fn toy_signature_single_agent() -> Signature {
     .unwrap()
 }
 
+/// Signature for a toy model (emergent sites).
+#[cfg(test)]
+pub(crate) fn toy_signature_emergent_agent() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("SiteA"),
+        SignatureDecl::sort("SiteB"),
+        SignatureDecl::sort("SiteC"),
+        SignatureDecl::sort("SiteAB"),
+        SignatureDecl::operation("e_A", [], Ty::sort("SiteA")),
+        SignatureDecl::operation("e_B", [], Ty::sort("SiteB")),
+        SignatureDecl::operation("e_C", [], Ty::sort("SiteC")),
+        SignatureDecl::operation("e_AB", [], Ty::sort("SiteAB")),
+        SignatureDecl::operation("bond_AB", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
+        SignatureDecl::operation("bond_C", [], Ty::tensor([Ty::sort("SiteAB"), Ty::sort("SiteC")])),
+    ])
+    .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,5 +272,48 @@ mod tests {
             bond : [] → ⊗ [SiteA, SiteB]
         "#]];
         expected.assert_eq(&toy_signature_v2().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_B : [] → ReB
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+        "#]];
+        expected.assert_eq(&toy_signature_single_agent().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            SiteA
+            SiteB
+            SiteC
+            SiteAB
+            #/ operations:
+            e_A : [] → SiteA
+            e_B : [] → SiteB
+            e_C : [] → SiteC
+            e_AB : [] → SiteAB
+            bond_AB : [] → ⊗ [SiteA, SiteB]
+            bond_C : [] → ⊗ [SiteAB, SiteC]
+        "#]];
+        expected.assert_eq(&toy_signature_emergent_agent().to_string());
     }
 }
