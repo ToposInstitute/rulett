@@ -588,4 +588,24 @@ mod tests {
                   (C [ca#1, cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
     }
+
+    #[test]
+    fn toy_model_phospho_tyrosine() {
+        let model = model::toy_model_phospho_tyrosine();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            A [e_sh2 []]
+            C [u [e_xtyr []]]
+            C [p [e_xtyr []]]
+            let [s1, s2] = bond [] in (A [s1], C [p s2 []])"#]]; // @Evan, do you know why this complex is not generated? It appears in the RHS of the last transition.
+        species.assert_eq(&generator.species(4).join("\n"));
+
+        let transitions = expect![[r#"
+            R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
+            R_dimerization []
+              : (A [e_sh2], C [p e_xtyr []])
+              → let [s1, s2] = bond [] in (A [s1], C [p s2 []])"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
+    }
 }

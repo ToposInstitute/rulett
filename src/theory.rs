@@ -240,6 +240,22 @@ pub(crate) fn toy_signature_emergent_agent() -> Signature {
     .unwrap()
 }
 
+/// Signature for a toy model (phospho tyrosine). See also https://github.com/ToposInstitute/sys-bio-collab/discussions/8
+#[cfg(test)]
+pub(crate) fn toy_signature_phospho_tyrosine() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("Tyr"),
+        SignatureDecl::sort("SH2"),
+        SignatureDecl::sort("xTyr"),
+        SignatureDecl::operation("e_sh2", [], Ty::sort("SH2")),
+        SignatureDecl::operation("e_xtyr", [], Ty::sort("xTyr")),
+        SignatureDecl::operation("u", [Ty::sort("xTyr")], Ty::sort("Tyr")),
+        SignatureDecl::operation("p", [Ty::sort("xTyr")], Ty::sort("Tyr")),
+        SignatureDecl::operation("bond", [], Ty::tensor([Ty::sort("SH2"), Ty::sort("xTyr")])),
+    ])
+    .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,5 +331,19 @@ mod tests {
             bond_C : [] → ⊗ [SiteAB, SiteC]
         "#]];
         expected.assert_eq(&toy_signature_emergent_agent().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Tyr
+            SH2
+            xTyr
+            #/ operations:
+            e_sh2 : [] → SH2
+            e_xtyr : [] → xTyr
+            u : [xTyr] → Tyr
+            p : [xTyr] → Tyr
+            bond : [] → ⊗ [SH2, xTyr]
+        "#]];
+        expected.assert_eq(&toy_signature_phospho_tyrosine().to_string());
     }
 }

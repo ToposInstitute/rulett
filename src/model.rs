@@ -213,32 +213,39 @@ impl fmt::Display for Model {
     }
 }
 
-/// A toy example of a ruled-based model (variant 1).
+/// A toy example of a rule-based model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_model_v1() -> Model {
     let decls = toy_model_decls("Site", "Site");
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
 
-/// A toy example of a ruled-based model (variant 2).
+/// A toy example of a rule-based model (variant 2).
 #[cfg(test)]
 pub(crate) fn toy_model_v2() -> Model {
     let decls = toy_model_decls("SiteA", "SiteB");
     Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
-/// A toy example of a ruled-based model (single agent).
+/// A toy example of a rule-based model (single agent).
 #[cfg(test)]
 pub(crate) fn toy_model_single_agent() -> Model {
     let decls = model_decls_single_agent();
     Model::parse(toy_signature_single_agent(), decls).unwrap()
 }
 
-/// A toy example of a ruled-based model (emergent agent).
+/// A toy example of a rule-based model (emergent agent).
 #[cfg(test)]
 pub(crate) fn toy_model_emergent_agent() -> Model {
     let decls = model_decls_emergent_agent();
     Model::parse(toy_signature_emergent_agent(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (phospho tyrosine).
+#[cfg(test)]
+pub(crate) fn toy_model_phospho_tyrosine() -> Model {
+    let decls = model_decls_phospho_tyrosine();
+    Model::parse(toy_signature_phospho_tyrosine(), decls).unwrap()
 }
 
 #[cfg(test)]
@@ -284,7 +291,7 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
     ]
 }
 
-/// A toy example of a ruled-based model (variant 2).
+/// A toy example of a rule-based model (variant 2).
 // #[cfg(test)]
 // pub(crate) fn toy_model_v3() -> Model {
 //     let decls = single_agent_model_decls();
@@ -434,7 +441,6 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
                 ]),
             ),
         ),
-        // Todo: Trimerization
         ModelDecl::rule(
             "R_trimerization",
             [],
@@ -451,6 +457,38 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
                 PatTm::res("C", [MorTm::var("e_AB"), MorTm::var("e_AB")]),
             ]),
             ABC,
+        ),
+    ]
+}
+
+#[cfg(test)]
+fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
+    [
+        ModelDecl::agent("A", [ObTm::var("x")], [Ty::sort("SH2")]),
+        ModelDecl::agent("C", [ObTm::var("y")], [Ty::sort("Tyr")]),
+        ModelDecl::rule(
+            "R_phosphorylation",
+            [],
+            [],
+            PatTm::res("A", [MorTm::app("u", MorTm::app("e_xtyr", []))]),
+            PatTm::res("A", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+        ),
+        ModelDecl::rule(
+            "R_dimerization",
+            [],
+            [],
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("e_sh2")]),
+                PatTm::res("C", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+            ]),
+            PatTm::let_(
+                [ObTm::var("s1"), ObTm::var("s2")],
+                MorTm::app("bond", []),
+                PatTm::tensor([
+                    PatTm::res("A", [MorTm::var("s1")]),
+                    PatTm::res("C", [MorTm::app("p", MorTm::app("s2", []))]),
+                ]),
+            ),
         ),
     ]
 }
@@ -585,5 +623,28 @@ mod tests {
                     (let [ab, ba] = bond [] in (A [ab, c], B [ba, c]), C [ca, cb])
         "#]];
         expected.assert_eq(&toy_model_emergent_agent().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Tyr
+            SH2
+            xTyr
+            #/ operations:
+            e_sh2 : [] → SH2
+            e_xtyr : [] → xTyr
+            u : [xTyr] → Tyr
+            p : [xTyr] → Tyr
+            bond : [] → ⊗ [SH2, xTyr]
+            #/ agents:
+            [x] : [SH2] ⊢ A [x]
+            [y] : [Tyr] ⊢ C [y]
+            #/ rules:
+            [] : [] ⊢ R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
+            [] : [] ⊢
+              R_dimerization []
+                : (A [e_sh2], C [p e_xtyr []])
+                → let [s1, s2] = bond [] in (A [s1], C [p s2 []])
+        "#]];
+        expected.assert_eq(&toy_model_phospho_tyrosine().to_string());
     }
 }
