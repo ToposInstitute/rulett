@@ -598,7 +598,7 @@ mod tests {
             A [e_sh2 []]
             C [u [e_xtyr []]]
             C [p [e_xtyr []]]
-            let [s1, s2] = bond [] in (A [s1], C [p s2 []])"#]]; // @Evan, do you know why this complex is not generated? It appears in the RHS of the last transition.
+            let [s1, s2] = bond [] in (A [s1], C [p [s2]])"#]]; // @Evan, do you know why this complex is not generated? It appears in the RHS of the last transition.
         species.assert_eq(&generator.species(4).join("\n"));
 
         let transitions = expect![[r#"

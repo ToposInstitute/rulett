@@ -486,7 +486,7 @@ fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("s1")]),
-                    PatTm::res("C", [MorTm::app("p", MorTm::app("s2", []))]),
+                    PatTm::res("C", [MorTm::app("p", [MorTm::var("s2")])]),
                 ]),
             ),
         ),
@@ -643,7 +643,7 @@ mod tests {
             [] : [] ⊢
               R_dimerization []
                 : (A [e_sh2], C [p e_xtyr []])
-                → let [s1, s2] = bond [] in (A [s1], C [p s2 []])
+                → let [s1, s2] = bond [] in (A [s1], C [p [s2]])
         "#]];
         expected.assert_eq(&toy_model_phospho_tyrosine().to_string());
     }
