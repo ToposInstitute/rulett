@@ -97,12 +97,23 @@ pub struct NetGenerator<'a> {
 /// State maintained by search algorithm for network generation.
 #[derive(Clone)]
 struct SearchState {
+    /// Current term.
     tm: ModelTm,
+
+    /// Current list of free variables.
     interface: Vec<IntermediateVar>,
-    // Wrap the union find in `Rc` since we don't have to mutate it at each
-    // branch point, only when restricting along an operation of co-arity >= 2.
+
+    /// Name generator used to create a new free variables.
+    name_gen: NameGenerator,
+
+    /// Current partition of (indexes of) original list of free variables.
+    ///
+    /// Wrap the union find in `Rc` since we don't have to mutate it at each
+    /// branch point, only when restricting along an operation of co-arity >= 2.
     uf: Rc<QuickUnionUf<UnionBySize>>,
-    min_match_idx: usize,
+
+    /// Set of free variables that have been seen but not substituted.
+    seen: im::HashSet<Name>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -197,15 +208,20 @@ impl<'a> NetGenerator<'a> {
         };
 
         // Initialize the search state, then run the search.
-        let uf = Rc::new(QuickUnionUf::new(n));
-        let state = SearchState { tm, interface, uf, min_match_idx: 0 };
+        let state = SearchState {
+            tm,
+            interface,
+            name_gen: Default::default(),
+            uf: Rc::new(QuickUnionUf::new(n)),
+            seen: Default::default(),
+        };
         let mut results = Vec::new();
         self.recurse(state, &mut results);
         results
     }
 
     fn recurse(&self, state: SearchState, results: &mut Vec<ModelTm>) {
-        let SearchState { interface, tm, uf, min_match_idx } = state;
+        let SearchState { interface, tm, name_gen, uf, seen } = state;
 
         // Success condition: found a closed term.
         if interface.is_empty() {
@@ -214,19 +230,16 @@ impl<'a> NetGenerator<'a> {
         }
 
         for idxs in (0..interface.len()).powerset() {
-            // To avoid duplicate species, skip any subsets that do not include
-            // at least one index beyond the current minimum.
+            // To avoid duplicate species, skip any matches that do not include
+            // at least one free variable that has not already been seen.
             //
-            // As a special case, never restrict along co-nullary operations as
-            // that causes infinite blow-up. Such operations, which include
+            // As a degenerate case, do not restrict along co-nullary operations
+            // as that causes infinite blow-up. Such operations, which include
             // [scalars](https://ncatlab.org/nlab/show/monoidal+category#scalars),
             // also seem pointless, but perhaps they're good for something?
-            let min_match_idx = match idxs.iter().min() {
-                Some(&n) if n >= min_match_idx => n,
-                _ => {
-                    continue;
-                }
-            };
+            if idxs.iter().all(|i| seen.contains(&interface[*i].name)) {
+                continue;
+            }
 
             // Get co-applicable operations, bailing early if there are none.
             let sorts = idxs.iter().map(|i| interface[*i].sort).collect_vec();
@@ -269,11 +282,12 @@ impl<'a> NetGenerator<'a> {
             for op in operations {
                 let (dom, cod) = self.model.signature().interface(op).unwrap();
 
+                let mut name_gen = name_gen.clone();
                 let mut interface_added = dom
                     .collect_sorts()
                     .into_iter()
                     .map(|sort| {
-                        let name = gen_var_with_sort(&sort);
+                        let name = name_gen.gensym(&sort.to_lowercase());
                         IntermediateVar { name, sort, component }
                     })
                     .collect_vec();
@@ -286,6 +300,16 @@ impl<'a> NetGenerator<'a> {
                     && interface_kept.iter().all(|var| var.component != component)
                 {
                     continue;
+                }
+
+                // Mark as seen all free variables up to the last matched
+                // variable (unless they're already eliminated by the match).
+                let mut seen = seen.clone();
+                let last_idx = idxs.iter().max().unwrap();
+                for (i, var) in interface.iter().enumerate().take(last_idx + 1) {
+                    if !idxs.contains(&i) {
+                        seen.insert(var.name);
+                    }
                 }
 
                 let restrict_at = if matches!(cod, Ty::Sort(_)) {
@@ -304,8 +328,9 @@ impl<'a> NetGenerator<'a> {
                 let state = SearchState {
                     tm: tm.restrict(restrict_at, restrict_along),
                     interface,
+                    name_gen,
                     uf: uf.clone(),
-                    min_match_idx,
+                    seen,
                 };
                 self.recurse(state, results)
             }
@@ -313,13 +338,9 @@ impl<'a> NetGenerator<'a> {
     }
 }
 
-fn gen_var_with_sort(sort: &Name) -> Name {
-    gensym(&sort.to_lowercase())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{super::model, *};
+    use super::{super::model, super::theory::*, *};
     use expect_test::expect;
 
     #[test]
@@ -396,5 +417,29 @@ mod tests {
               : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
               → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
+    }
+
+    #[test]
+    fn expose_site() {
+        type SigDecl = SignatureDecl;
+        let sig = Signature::parse([
+            SigDecl::sort("SiteA"),
+            SigDecl::sort("SiteB"),
+            SigDecl::sort("MaybeSiteB"),
+            SigDecl::operation("noSite", [], Ty::sort("MaybeSiteB")),
+            SigDecl::operation("hasSite", [Ty::sort("SiteB")], Ty::sort("MaybeSiteB")),
+            SigDecl::operation("bond", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
+        ])
+        .unwrap();
+        let decls = [
+            ModelDecl::agent("A", [ObTm::var("s")], [Ty::sort("SiteA")]),
+            ModelDecl::agent("B", [ObTm::var("s")], [Ty::sort("MaybeSiteB")]),
+        ];
+        let model = Model::parse(sig, decls).unwrap();
+
+        let species = expect![[r#"
+            B [noSite []]
+            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]];
+        species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
     }
 }

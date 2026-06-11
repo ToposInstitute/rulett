@@ -1,8 +1,7 @@
 //! Names (interned symbols).
 
+use imbl as im;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-
 use ustr::Ustr;
 
 /// Type of names (internal symbols) in this crate.
@@ -13,17 +12,27 @@ pub fn name(s: impl Into<Name>) -> Name {
     s.into()
 }
 
-/// Generate a unique [`Name`] with the given tag.
+/// Generates unique names (across calls to this object).
 ///
-/// Follows the convention of Julia's `gensym`: the returned name has the form
-/// `##<tag>#<n>`, where `n` is a monotonically increasing counter.
-pub fn gensym(tag: &str) -> Name {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    Name::from(&format!("##{tag}#{n}"))
+/// Uses a persistent data structure, so is cheap to clone.
+#[derive(Clone, Default)]
+pub struct NameGenerator(im::HashMap<Name, usize>);
+
+impl NameGenerator {
+    /// Generate a unique [`Name`] with the given tag.
+    ///
+    /// Follows the convention of Julia's `gensym`: the returned name has the
+    /// form `##<tag>#<n>`, where `n` is a monotonically increasing counter.
+    pub fn gensym(&mut self, tag: &str) -> Name {
+        let n = self.0.entry(tag.into()).or_default();
+        *n += 1;
+        Name::from(&format!("##{tag}#{n}"))
+    }
 }
 
 /// Ensure that all names are unique by appending numbers if necessary.
+///
+/// Assumes that no name ends with `#{n}` for some `n`.
 pub fn uniquify_names(names: &mut [Name]) {
     let mut counts = HashMap::new();
     for name in names.iter().copied() {
@@ -36,19 +45,5 @@ pub fn uniquify_names(names: &mut [Name]) {
             *name = format!("{}#{}", name, count).into();
             *count -= 1;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn gensym_is_unique() {
-        let a = gensym("x");
-        let b = gensym("x");
-        assert_ne!(a, b);
-        assert!(a.as_str().starts_with("##x#"));
-        assert!(b.as_str().starts_with("##x#"));
     }
 }
