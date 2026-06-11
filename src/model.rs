@@ -298,52 +298,40 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
     ]
 }
 
-/// A toy example of a rule-based model (variant 2).
-// #[cfg(test)]
-// pub(crate) fn toy_model_v3() -> Model {
-//     let decls = single_agent_model_decls();
-//     Model::parse(toy_signature_v2(), decls).unwrap()
-// }
-
 #[cfg(test)]
 fn model_decls_single_agent() -> [ModelDecl; 3] {
-    let ReA = PatTm::res("M", MorTm::var("iota_A"));
-    let ReB = PatTm::res("M", MorTm::var("iota_B"));
-    let ReK = PatTm::res("M", MorTm::var("iota_K"));
+    let re_a = PatTm::res("M", MorTm::var("iota_A"));
+    let re_b = PatTm::res("M", MorTm::var("iota_B"));
+    let re_k = PatTm::res("M", MorTm::var("iota_K"));
 
-    let SiteA = PatTm::res("M", MorTm::var("iota_SiteA"));
-    let SiteB = PatTm::res("M", MorTm::var("iota_SiteB"));
-    let Res = PatTm::res("M", MorTm::var("iota_Res"));
+    let site_a = PatTm::res("M", MorTm::var("iota_SiteA"));
+    let site_b = PatTm::res("M", MorTm::var("iota_SiteB"));
+    let res = PatTm::res("M", MorTm::var("iota_Res"));
 
-    let A = PatTm::tensor([ReA, SiteB, Res]);
-    let B = PatTm::tensor([ReB, SiteA]);
-    let K = PatTm::tensor([ReK]);
+    let a: PatTm = PatTm::tensor([re_a, site_b, res]);
+    let b = PatTm::tensor([re_b, site_a]);
+    let k = PatTm::tensor([re_k]);
 
-    // @Evan: The next three lines do a bit what the profunctor would do. Do we need this for now?
-    // let A = A.subst(&mut vec![(name("iota_A"), MorTm::app("iota_A", MorTm::app("ground_A", [])))]);
-    // let B = B.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("ground_B", [])))]);
-    // let K = K.subst(&mut vec![(name("iota_K"), MorTm::app("iota_K", MorTm::app("ground_K", [])))]);
+    let a_phos =
+        a.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("phos", [])))]);
+    let a_unphos =
+        a.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("unphos", [])))]);
 
-    let A_phos =
-        A.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("phos", [])))]);
-    let A_unphos =
-        A.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("unphos", [])))]);
-
-    let A_free = A.subst(&mut vec![(
+    let a_free = a.subst(&mut vec![(
         name("iota_SiteB"),
         MorTm::app("iota_SiteB", MorTm::app("empty", [])),
     )]);
-    let B_free = B.subst(&mut vec![(
+    let b_free = b.subst(&mut vec![(
         name("iota_SiteA"),
         MorTm::app("iota_SiteA", MorTm::app("empty", [])),
     )]);
-    let AB = PatTm::tensor([A, B]);
-    let AB_complex = AB.subst(&mut vec![
+    let ab = PatTm::tensor([a, b]);
+    let ab_complex = ab.subst(&mut vec![
         (name("iota_SiteA"), MorTm::app("iota_SiteA", MorTm::app("s1", []))),
         (name("iota_SiteB"), MorTm::app("iota_SiteB", MorTm::app("s2", []))),
     ]);
-    let AB_complex =
-        PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), AB_complex); // TODO: ask Evan how to do this
+    let ab_complex =
+        PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), ab_complex); // TODO: ask Evan how to do this
     [
         ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
         ModelDecl::rule(
@@ -351,13 +339,13 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
             [ObTm::var("r")],
             [Ty::sort("Res")],
             PatTm::tensor([
-                A_free.subst(&mut vec![(
+                a_free.subst(&mut vec![(
                     name("iota_Res"),
                     MorTm::app("iota_Res", MorTm::app("r", [])),
                 )]), // @Evan: I believe the substitution here is required to introduce the variable "r"
-                B_free,
+                b_free,
             ]),
-            AB_complex
+            ab_complex
                 .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("r", [])))]),
         ),
         ModelDecl::rule(
@@ -365,18 +353,18 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
             [ObTm::var("s")],
             [Ty::sort("SiteB")],
             PatTm::tensor([
-                A_unphos.subst(&mut vec![(
+                a_unphos.subst(&mut vec![(
                     name("iota_SiteB"),
                     MorTm::app("iota_SiteB", MorTm::app("s", [])),
                 )]),
-                K.clone(),
+                k.clone(),
             ]), // @Evan: what do you think of the requirement to clone here?
             PatTm::tensor([
-                A_phos.subst(&mut vec![(
+                a_phos.subst(&mut vec![(
                     name("iota_SiteB"),
                     MorTm::app("iota_SiteB", MorTm::app("s", [])),
                 )]),
-                K,
+                k,
             ]),
         ),
     ]
@@ -384,7 +372,7 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
 
 #[cfg(test)]
 fn model_decls_emergent_agent() -> [ModelDecl; 5] {
-    let AB = PatTm::let_(
+    let ab = PatTm::let_(
         [ObTm::var("ab"), ObTm::var("ba")],
         MorTm::app("bond", []),
         PatTm::tensor([
@@ -392,29 +380,13 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
             PatTm::res("B", [MorTm::var("ba"), MorTm::var("c")]),
         ]),
     );
-    let AC = PatTm::let_(
+    let abc_incomplete = PatTm::let_(
         [ObTm::var("ac"), ObTm::var("ca")],
         MorTm::app("bond", []),
-        PatTm::tensor([
-            PatTm::res("A", [MorTm::var("b"), MorTm::var("ac")]),
-            PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")]),
-        ]),
+        PatTm::tensor([ab, PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")])]),
     );
-    let ABC_incomplete = PatTm::let_(
-        [ObTm::var("ac"), ObTm::var("ca")],
-        MorTm::app("bond", []),
-        PatTm::tensor([AB, PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")])]),
-    );
-    let ABC =
-        PatTm::let_([ObTm::var("bc"), ObTm::var("cb")], MorTm::app("bond", []), ABC_incomplete);
-    // let BC = PatTm::let_(
-    //             [ObTm::var("bc1"), ObTm::var("bc2")],
-    //             MorTm::app("bond", []),
-    //             PatTm::tensor([
-    //                 PatTm::res("B", [MorTm::var("ab2"), MorTm::var("bc1")]),
-    //                 PatTm::res("C", [MorTm::var("ac2"), MorTm::var("bc2")])
-    //             ]
-    //             ));
+    let abc =
+        PatTm::let_([ObTm::var("bc"), ObTm::var("cb")], MorTm::app("bond", []), abc_incomplete);
     [
         ModelDecl::agent(
             "A",
@@ -463,45 +435,14 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
                 ),
                 PatTm::res("C", [MorTm::var("e_AB"), MorTm::var("e_AB")]),
             ]),
-            ABC,
+            abc,
         ),
     ]
 }
 
 #[cfg(test)]
 fn model_decls_directionality() -> [ModelDecl; 5] {
-    // let AB = PatTm::let_(
-    //     [ObTm::var("ab"), ObTm::var("ba")],
-    //     MorTm::app("bond", []),
-    //     PatTm::tensor([
-    //         PatTm::res("A", [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("ab")]),
-    //         PatTm::res("B", [MorTm::var("ba"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")]),
-    //     ]),
-    // );
-    // let AC = PatTm::let_(
-    //     [ObTm::var("ac"), ObTm::var("ca")],
-    //     MorTm::app("bond", []),
-    //     PatTm::tensor([
-    //         PatTm::res("A", [MorTm::var("b"), MorTm::var("ac")]),
-    //         PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")]),
-    //     ]),
-    // );
-    // let ABC_incomplete = PatTm::let_(
-    //     [ObTm::var("ac"), ObTm::var("ca")],
-    //     MorTm::app("bond", []),
-    //     PatTm::tensor([AB, PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")])]),
-    // );
-    // let ABC =
-    //     PatTm::let_([ObTm::var("bc"), ObTm::var("cb")], MorTm::app("bond", []), ABC_incomplete);
-    // let BC = PatTm::let_(
-    //             [ObTm::var("bc1"), ObTm::var("bc2")],
-    //             MorTm::app("bond", []),
-    //             PatTm::tensor([
-    //                 PatTm::res("B", [MorTm::var("ab2"), MorTm::var("bc1")]),
-    //                 PatTm::res("C", [MorTm::var("ac2"), MorTm::var("bc2")])
-    //             ]
-    //             ));
-    let ABC = PatTm::let_(
+    let abc = PatTm::let_(
         [ObTm::var("ac"), ObTm::var("ca")],
         MorTm::app("bond_Ch", []),
         PatTm::let_(
@@ -535,7 +476,7 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
             [Ty::sort("Site_ABh"), Ty::sort("Site_ABt")],
         ),
         ModelDecl::rule(
-            "R_dimerization",
+            "R_AtoB_dimerization",
             [
                 ObTm::var("id_head"),
                 ObTm::var("id_Site_C1"),
@@ -589,10 +530,10 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
                 ),
                 PatTm::res("C", [MorTm::var("e_Ch"), MorTm::var("e_Ct")]),
             ]),
-            ABC,
+            abc,
         ),
     ]
-}
+} // This is not polymerization, cause there is no B to A dimerization.
 
 #[cfg(test)]
 fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
@@ -779,7 +720,7 @@ mod tests {
             [ch, ct] : [Site_ABh, Site_ABt] ⊢ C [ch, ct]
             #/ rules:
             [id_head, id_Site_C1, id_Site_C2, id_tail] : [head, Site_C, Site_C, tail] ⊢
-              R_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
+              R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
                 : (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
                 → let [s1, s2] = bond_AB [] in
                   (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
