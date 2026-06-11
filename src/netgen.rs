@@ -604,32 +604,32 @@ mod tests {
               (A [e_h [], e_C [], at#1], A [ah#2, e_C [], e_t []])
             let (ah#1, at#2) = bond_AB [] in
               (A [ah#1, e_C [], e_t []], A [e_h [], e_C [], at#2])
-            let (at#1, ah#2) = bond_AB [] in
-              let (ah#1, at#2) = bond_AB [] in
+            let (ah#1, at#2) = bond_AB [] in
+              let (at#1, ah#2) = bond_AB [] in
                 (A [ah#1, e_C [], at#1], A [ah#2, e_C [], at#2])
             let (at, bh) = bond_AB [] in (A [e_h [], e_C [], at], B [bh, e_C [], e_t []])
             let (ah, bt) = bond_AB [] in (A [ah, e_C [], e_t []], B [e_h [], e_C [], bt])
-            let (at, bh) = bond_AB [] in
-              let (ah, bt) = bond_AB [] in (A [ah, e_C [], at], B [bh, e_C [], bt])
-            let (ac, ch) = bond_Ch [] in (A [e_h [], ac, e_t []], C [ch, e_ABt []])
+            let (ah, bt) = bond_AB [] in
+              let (at, bh) = bond_AB [] in (A [ah, e_C [], at], B [bh, e_C [], bt])
             let (ac, ct) = bond_Ct [] in (A [e_h [], ac, e_t []], C [e_ABh [], ct])
-            let (ac, ch) = bond_Ch [] in
-              let (ah, at) = bond_AB [] in (A [ah, ac, at], C [ch, e_ABt []])
+            let (ac, ch) = bond_Ch [] in (A [e_h [], ac, e_t []], C [ch, e_ABt []])
             let (ac, ct) = bond_Ct [] in
               let (ah, at) = bond_AB [] in (A [ah, ac, at], C [e_ABh [], ct])
+            let (ac, ch) = bond_Ch [] in
+              let (ah, at) = bond_AB [] in (A [ah, ac, at], C [ch, e_ABt []])
             let (bt#1, bh#2) = bond_AB [] in
               (B [e_h [], e_C [], bt#1], B [bh#2, e_C [], e_t []])
             let (bh#1, bt#2) = bond_AB [] in
               (B [bh#1, e_C [], e_t []], B [e_h [], e_C [], bt#2])
-            let (bt#1, bh#2) = bond_AB [] in
-              let (bh#1, bt#2) = bond_AB [] in
+            let (bh#1, bt#2) = bond_AB [] in
+              let (bt#1, bh#2) = bond_AB [] in
                 (B [bh#1, e_C [], bt#1], B [bh#2, e_C [], bt#2])
-            let (bc, ch) = bond_Ch [] in (B [e_h [], bc, e_t []], C [ch, e_ABt []])
             let (bc, ct) = bond_Ct [] in (B [e_h [], bc, e_t []], C [e_ABh [], ct])
-            let (bc, ch) = bond_Ch [] in
-              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [ch, e_ABt []])
+            let (bc, ch) = bond_Ch [] in (B [e_h [], bc, e_t []], C [ch, e_ABt []])
             let (bc, ct) = bond_Ct [] in
-              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [e_ABh [], ct])"#]];
+              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [e_ABh [], ct])
+            let (bc, ch) = bond_Ch [] in
+              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [ch, e_ABt []])"#]];
         species.assert_eq(&generator.species(2).join("\n")); // Note that this model allows infinite polymerization
 
         let transitions = expect![[r#"
@@ -690,14 +690,14 @@ mod tests {
                   let [s1, s2] = bond_AB [] in
                     (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail])
                 )
-            let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+            let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (A [ah, e_C [], at], R_dimerization [id_head, e_C [], e_C [], id_tail])
-              : let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+              : let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (A [ah, e_C [], at], (A [id_head, e_C [], e_t], B [e_h, e_C [], id_tail]))
-              → let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+              → let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (
                     A [ah, e_C [], at],
                     let [s1, s2] = bond_AB [] in
@@ -739,11 +739,11 @@ mod tests {
                       let [ab, ba] = bond_AB [] in
                         (A [e_h [], ac, ab], B [ba, bc, id_tail], C [ca, cb])
                 )
-            let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+            let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (A [ah, e_C [], at], R_trimerization [id_head, id_tail])
-              : let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+              : let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (
                     A [ah, e_C [], at],
                     (
@@ -752,8 +752,8 @@ mod tests {
                       C [e_Ch, e_Ct]
                     )
                   )
-              → let (at, id_head) = bond_AB [] in
-                let (ah, id_tail) = bond_AB [] in
+              → let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
                   (
                     A [ah, e_C [], at],
                     let [ac, ca] = bond_Ch [] in
@@ -787,14 +787,14 @@ mod tests {
                   let [s1, s2] = bond_AB [] in
                     (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail])
                 )
-            let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+            let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (B [bh, e_C [], bt], R_dimerization [id_head, e_C [], e_C [], id_tail])
-              : let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+              : let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (B [bh, e_C [], bt], (A [id_head, e_C [], e_t], B [e_h, e_C [], id_tail]))
-              → let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+              → let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (
                     B [bh, e_C [], bt],
                     let [s1, s2] = bond_AB [] in
@@ -836,11 +836,11 @@ mod tests {
                       let [ab, ba] = bond_AB [] in
                         (A [e_h [], ac, ab], B [ba, bc, id_tail], C [ca, cb])
                 )
-            let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+            let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (B [bh, e_C [], bt], R_trimerization [id_head, id_tail])
-              : let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+              : let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (
                     B [bh, e_C [], bt],
                     (
@@ -849,40 +849,14 @@ mod tests {
                       C [e_Ch, e_Ct]
                     )
                   )
-              → let (bt, id_head) = bond_AB [] in
-                let (bh, id_tail) = bond_AB [] in
+              → let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
                   (
                     B [bh, e_C [], bt],
                     let [ac, ca] = bond_Ch [] in
                       let [bc, cb] = bond_Ct [] in
                         let [ab, ba] = bond_AB [] in
                           (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
-                  )
-            let (ct, id_Site_C1) = bond_Ct [] in
-                (C [e_ABh [], ct], R_dimerization [e_h [], id_Site_C1, e_C [], e_t []])
-              : let (ct, id_Site_C1) = bond_Ct [] in
-                (C [e_ABh [], ct], (A [e_h [], id_Site_C1, e_t], B [e_h, e_C [], e_t []]))
-              → let (ct, id_Site_C1) = bond_Ct [] in
-                (
-                  C [e_ABh [], ct],
-                  let [s1, s2] = bond_AB [] in
-                    (A [e_h [], id_Site_C1, s1], B [s2, e_C [], e_t []])
-                )
-            let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  (C [e_ABh [], ct], R_dimerization [id_head, id_Site_C1, e_C [], id_tail])
-              : let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  (
-                    C [e_ABh [], ct],
-                    (A [id_head, id_Site_C1, e_t], B [e_h, e_C [], id_tail])
-                  )
-              → let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  (
-                    C [e_ABh [], ct],
-                    let [s1, s2] = bond_AB [] in
-                      (A [id_head, id_Site_C1, s1], B [s2, e_C [], id_tail])
                   )
             let (ct, id_Site_C2) = bond_Ct [] in
                 (C [e_ABh [], ct], R_dimerization [e_h [], e_C [], id_Site_C2, e_t []])
@@ -893,6 +867,16 @@ mod tests {
                   C [e_ABh [], ct],
                   let [s1, s2] = bond_AB [] in
                     (A [e_h [], e_C [], s1], B [s2, id_Site_C2, e_t []])
+                )
+            let (ct, id_Site_C1) = bond_Ct [] in
+                (C [e_ABh [], ct], R_dimerization [e_h [], id_Site_C1, e_C [], e_t []])
+              : let (ct, id_Site_C1) = bond_Ct [] in
+                (C [e_ABh [], ct], (A [e_h [], id_Site_C1, e_t], B [e_h, e_C [], e_t []]))
+              → let (ct, id_Site_C1) = bond_Ct [] in
+                (
+                  C [e_ABh [], ct],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], id_Site_C1, s1], B [s2, e_C [], e_t []])
                 )
             let (id_head, id_tail) = bond_AB [] in
                 let (ct, id_Site_C2) = bond_Ct [] in
@@ -910,6 +894,32 @@ mod tests {
                     let [s1, s2] = bond_AB [] in
                       (A [id_head, e_C [], s1], B [s2, id_Site_C2, id_tail])
                   )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (C [e_ABh [], ct], R_dimerization [id_head, id_Site_C1, e_C [], id_tail])
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    (A [id_head, id_Site_C1, e_t], B [e_h, e_C [], id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, id_Site_C1, s1], B [s2, e_C [], id_tail])
+                  )
+            let (ch, id_Site_C2) = bond_Ch [] in
+                (C [ch, e_ABt []], R_dimerization [e_h [], e_C [], id_Site_C2, e_t []])
+              : let (ch, id_Site_C2) = bond_Ch [] in
+                (C [ch, e_ABt []], (A [e_h [], e_C [], e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ch, id_Site_C2) = bond_Ch [] in
+                (
+                  C [ch, e_ABt []],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, id_Site_C2, e_t []])
+                )
             let (ch, id_Site_C1) = bond_Ch [] in
                 (C [ch, e_ABt []], R_dimerization [e_h [], id_Site_C1, e_C [], e_t []])
               : let (ch, id_Site_C1) = bond_Ch [] in
@@ -920,6 +930,22 @@ mod tests {
                   let [s1, s2] = bond_AB [] in
                     (A [e_h [], id_Site_C1, s1], B [s2, e_C [], e_t []])
                 )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (C [ch, e_ABt []], R_dimerization [id_head, e_C [], id_Site_C2, id_tail])
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    (A [id_head, e_C [], e_t], B [e_h, id_Site_C2, id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, e_C [], s1], B [s2, id_Site_C2, id_tail])
+                  )
             let (id_head, id_tail) = bond_AB [] in
                 let (ch, id_Site_C1) = bond_Ch [] in
                   (C [ch, e_ABt []], R_dimerization [id_head, id_Site_C1, e_C [], id_tail])
@@ -949,6 +975,19 @@ mod tests {
                     let [s1, s2] = bond_AB [] in
                       (A [e_h [], id_Site_C1, s1], B [s2, id_Site_C2, e_t []])
                   )
+            let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (C [ch, ct], R_dimerization [e_h [], id_Site_C1, id_Site_C2, e_t []])
+              : let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (C [ch, ct], (A [e_h [], id_Site_C1, e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [ch, ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [e_h [], id_Site_C1, s1], B [s2, id_Site_C2, e_t []])
+                  )
             let (id_head, id_tail) = bond_AB [] in
                 let (ct, id_Site_C2) = bond_Ct [] in
                   let (ch, id_Site_C1) = bond_Ch [] in
@@ -968,59 +1007,20 @@ mod tests {
                       let [s1, s2] = bond_AB [] in
                         (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
                     )
-            let (ch, id_Site_C2) = bond_Ch [] in
-                (C [ch, e_ABt []], R_dimerization [e_h [], e_C [], id_Site_C2, e_t []])
-              : let (ch, id_Site_C2) = bond_Ch [] in
-                (C [ch, e_ABt []], (A [e_h [], e_C [], e_t], B [e_h, id_Site_C2, e_t []]))
-              → let (ch, id_Site_C2) = bond_Ch [] in
-                (
-                  C [ch, e_ABt []],
-                  let [s1, s2] = bond_AB [] in
-                    (A [e_h [], e_C [], s1], B [s2, id_Site_C2, e_t []])
-                )
             let (id_head, id_tail) = bond_AB [] in
                 let (ch, id_Site_C2) = bond_Ch [] in
-                  (C [ch, e_ABt []], R_dimerization [id_head, e_C [], id_Site_C2, id_tail])
-              : let (id_head, id_tail) = bond_AB [] in
-                let (ch, id_Site_C2) = bond_Ch [] in
-                  (
-                    C [ch, e_ABt []],
-                    (A [id_head, e_C [], e_t], B [e_h, id_Site_C2, id_tail])
-                  )
-              → let (id_head, id_tail) = bond_AB [] in
-                let (ch, id_Site_C2) = bond_Ch [] in
-                  (
-                    C [ch, e_ABt []],
-                    let [s1, s2] = bond_AB [] in
-                      (A [id_head, e_C [], s1], B [s2, id_Site_C2, id_tail])
-                  )
-            let (ct, id_Site_C1) = bond_Ct [] in
-                let (ch, id_Site_C2) = bond_Ch [] in
-                  (C [ch, ct], R_dimerization [e_h [], id_Site_C1, id_Site_C2, e_t []])
-              : let (ct, id_Site_C1) = bond_Ct [] in
-                let (ch, id_Site_C2) = bond_Ch [] in
-                  (C [ch, ct], (A [e_h [], id_Site_C1, e_t], B [e_h, id_Site_C2, e_t []]))
-              → let (ct, id_Site_C1) = bond_Ct [] in
-                let (ch, id_Site_C2) = bond_Ch [] in
-                  (
-                    C [ch, ct],
-                    let [s1, s2] = bond_AB [] in
-                      (A [e_h [], id_Site_C1, s1], B [s2, id_Site_C2, e_t []])
-                  )
-            let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
                     (C [ch, ct], R_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail])
               : let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  let (ch, id_Site_C2) = bond_Ch [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
                     (
                       C [ch, ct],
                       (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
                     )
               → let (id_head, id_tail) = bond_AB [] in
-                let (ct, id_Site_C1) = bond_Ct [] in
-                  let (ch, id_Site_C2) = bond_Ch [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
                     (
                       C [ch, ct],
                       let [s1, s2] = bond_AB [] in
@@ -1060,20 +1060,20 @@ mod tests {
                   let [s1, s2] = bond_AB [] in
                     (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail#2])
                 )
-            let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     R_dimerization [id_head#1, e_C [], e_C [], id_tail#1],
                     R_dimerization [id_head#2, e_C [], e_C [], id_tail#2]
                   )
-              : let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     (A [id_head#1, e_C [], e_t], B [e_h, e_C [], id_tail#1]),
                     (A [id_head#2, e_C [], e_t], B [e_h, e_C [], id_tail#2])
                   )
-              → let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     let [s1, s2] = bond_AB [] in
                       (A [id_head#1, e_C [], s1], B [s2, e_C [], id_tail#1]),
@@ -1124,14 +1124,14 @@ mod tests {
                       let [ab, ba] = bond_AB [] in
                         (A [e_h [], ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
                 )
-            let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     R_dimerization [id_head#1, e_C [], e_C [], id_tail#1],
                     R_trimerization [id_head#2, id_tail#2]
                   )
-              : let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     (A [id_head#1, e_C [], e_t], B [e_h, e_C [], id_tail#1]),
                     (
@@ -1140,8 +1140,8 @@ mod tests {
                       C [e_Ch, e_Ct]
                     )
                   )
-              → let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     let [s1, s2] = bond_AB [] in
                       (A [id_head#1, e_C [], s1], B [s2, e_C [], id_tail#1]),
@@ -1198,14 +1198,14 @@ mod tests {
                       let [ab, ba] = bond_AB [] in
                         (A [e_h [], ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
                 )
-            let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     R_trimerization [id_head#1, id_tail#1],
                     R_trimerization [id_head#2, id_tail#2]
                   )
-              : let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     (
                       let [s1, s2] = bond [] in
@@ -1218,8 +1218,8 @@ mod tests {
                       C [e_Ch, e_Ct]
                     )
                   )
-              → let (id_tail#1, id_head#2) = bond_AB [] in
-                let (id_head#1, id_tail#2) = bond_AB [] in
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
                   (
                     let [ac, ca] = bond_Ch [] in
                       let [bc, cb] = bond_Ct [] in
