@@ -110,7 +110,7 @@ struct SearchState {
     uf: Rc<QuickUnionUf<UnionBySize>>,
 
     /// Set of free variables that have been seen but not substituted.
-    seen: HashSet<Name>,
+    seen: im::HashSet<Name>,
 }
 
 #[derive(Clone, Copy, Debug)]
