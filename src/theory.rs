@@ -222,7 +222,7 @@ pub(crate) fn toy_signature_single_agent() -> Signature {
     .unwrap()
 }
 
-/// Signature for a toy model (emergent sites).
+/// Signature for a toy model (emergent agent (dimerization of A and B creates C-binding ability)).
 #[cfg(test)]
 pub(crate) fn toy_signature_emergent_agent() -> Signature {
     Signature::parse([
@@ -236,6 +236,35 @@ pub(crate) fn toy_signature_emergent_agent() -> Signature {
         SignatureDecl::operation("e_AB", [], Ty::sort("SiteAB")),
         SignatureDecl::operation("bond_AB", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
         SignatureDecl::operation("bond_C", [], Ty::tensor([Ty::sort("SiteAB"), Ty::sort("SiteC")])),
+    ])
+    .unwrap()
+}
+
+/// Signature for a toy model (emergent agent with directionality).
+#[cfg(test)]
+pub(crate) fn toy_signature_directionality() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("head"),
+        SignatureDecl::sort("tail"),
+        SignatureDecl::sort("Site_C"),
+        SignatureDecl::sort("Site_ABh"),
+        SignatureDecl::sort("Site_ABt"),
+        SignatureDecl::operation("e_h", [], Ty::sort("head")),
+        SignatureDecl::operation("e_t", [], Ty::sort("tail")),
+        SignatureDecl::operation("e_C", [], Ty::sort("Site_C")),
+        SignatureDecl::operation("e_ABh", [], Ty::sort("Site_ABh")),
+        SignatureDecl::operation("e_ABt", [], Ty::sort("Site_ABt")),
+        SignatureDecl::operation("bond_AB", [], Ty::tensor([Ty::sort("head"), Ty::sort("tail")])),
+        SignatureDecl::operation(
+            "bond_Ch",
+            [],
+            Ty::tensor([Ty::sort("Site_ABh"), Ty::sort("Site_C")]),
+        ),
+        SignatureDecl::operation(
+            "bond_Ct",
+            [],
+            Ty::tensor([Ty::sort("Site_ABt"), Ty::sort("Site_C")]),
+        ),
     ])
     .unwrap()
 }
@@ -331,6 +360,25 @@ mod tests {
             bond_C : [] → ⊗ [SiteAB, SiteC]
         "#]];
         expected.assert_eq(&toy_signature_emergent_agent().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            head
+            tail
+            Site_C
+            Site_ABh
+            Site_ABt
+            #/ operations:
+            e_h : [] → head
+            e_t : [] → tail
+            e_C : [] → SiteC
+            e_ABh : [] → Site_ABh
+            e_ABt : [] → SiteABt
+            bond_AB : [] → ⊗ [head, tail]
+            bond_Ch : [] → ⊗ [Site_ABh, Site_C]
+            bond_Ct : [] → ⊗ [Site_ABt, Site_C]
+        "#]];
+        expected.assert_eq(&toy_signature_directionality().to_string());
 
         let expected = expect![[r#"
             #/ sorts:
