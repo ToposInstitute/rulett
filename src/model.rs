@@ -624,7 +624,7 @@ fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
             ),
         ),
     ]
-}
+} // TODO: Implement this model as preorder (currently `u` and `p` are parallel morphisms)
 
 #[cfg(test)]
 mod tests {

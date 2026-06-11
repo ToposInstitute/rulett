@@ -371,9 +371,9 @@ mod tests {
             #/ operations:
             e_h : [] → head
             e_t : [] → tail
-            e_C : [] → SiteC
+            e_C : [] → Site_C
             e_ABh : [] → Site_ABh
-            e_ABt : [] → SiteABt
+            e_ABt : [] → Site_ABt
             bond_AB : [] → ⊗ [head, tail]
             bond_Ch : [] → ⊗ [Site_ABh, Site_C]
             bond_Ct : [] → ⊗ [Site_ABt, Site_C]

@@ -438,10 +438,11 @@ mod tests {
 
         let species = expect![[r#"
             B [noSite []]
-            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]];
+            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]]; // Note that `A` is unrestrictable.
         species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
     }
 
+    #[test]
     fn toy_model_single_agent() {
         let model = model::toy_model_single_agent();
         let generator = NetGenerator::new(&model);
@@ -454,10 +455,10 @@ mod tests {
             M [iota_SiteB [emptyB []]]
             M [iota_Res [phos []]]
             M [iota_Res [unphos []]]
-            let (##sitea#27, ##siteb#32) = bond [] in
-              (M [iota_SiteA [##sitea#27]], M [iota_SiteB [##siteb#32]])
-            let (##siteb#34, ##sitea#38) = bond [] in
-              (M [iota_SiteB [##siteb#34]], M [iota_SiteA [##sitea#38]])"#]];
+            let (##sitea#1, ##siteb#1) = bond [] in
+              (M [iota_SiteA [##sitea#1]], M [iota_SiteB [##siteb#1]])
+            let (##siteb#1, ##sitea#1) = bond [] in
+              (M [iota_SiteB [##siteb#1]], M [iota_SiteA [##sitea#1]])"#]];
         species.assert_eq(&generator.species(2).join("\n"));
 
         let transitions = expect![[r#"
@@ -484,16 +485,15 @@ mod tests {
             phosphorylate [emptyB []]
               : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
               → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
-            let (s, ##sitea#63) = bond [] in
-                (M [iota_SiteA [##sitea#63]], phosphorylate [s])
-              : let (s, ##sitea#63) = bond [] in
+            let (s, ##sitea#1) = bond [] in (M [iota_SiteA [##sitea#1]], phosphorylate [s])
+              : let (s, ##sitea#1) = bond [] in
                 (
-                  M [iota_SiteA [##sitea#63]],
+                  M [iota_SiteA [##sitea#1]],
                   ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
                 )
-              → let (s, ##sitea#63) = bond [] in
+              → let (s, ##sitea#1) = bond [] in
                 (
-                  M [iota_SiteA [##sitea#63]],
+                  M [iota_SiteA [##sitea#1]],
                   ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
                 )"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
@@ -509,36 +509,36 @@ mod tests {
             B [e_A [], e_C []]
             C [e_AB [], e_AB []]
             let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, e_C []])
-            let (ac, ca) = bond_C [] in (A [e_B [], ac], C [ca, e_AB []])
             let (ac, cb) = bond_C [] in (A [e_B [], ac], C [e_AB [], cb])
-            let (bc, ca) = bond_C [] in (B [e_A [], bc], C [ca, e_AB []])
+            let (ac, ca) = bond_C [] in (A [e_B [], ac], C [ca, e_AB []])
             let (bc, cb) = bond_C [] in (B [e_A [], bc], C [e_AB [], cb])
+            let (bc, ca) = bond_C [] in (B [e_A [], bc], C [ca, e_AB []])
             let (ac#2, cb) = bond_C [] in
               let (ac#1, ca) = bond_C [] in (A [e_B [], ac#1], A [e_B [], ac#2], C [ca, cb])
-            let (ac#2, ca) = bond_C [] in
-              let (ac#1, cb) = bond_C [] in (A [e_B [], ac#1], A [e_B [], ac#2], C [ca, cb])
+            let (ac#1, cb) = bond_C [] in
+              let (ac#2, ca) = bond_C [] in (A [e_B [], ac#1], A [e_B [], ac#2], C [ca, cb])
             let (bc, cb) = bond_C [] in
               let (ac, ca) = bond_C [] in (A [e_B [], ac], B [e_A [], bc], C [ca, cb])
-            let (bc, ca) = bond_C [] in
-              let (ac, cb) = bond_C [] in (A [e_B [], ac], B [e_A [], bc], C [ca, cb])
-            let (bc, ca) = bond_C [] in
-              let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, bc], C [ca, e_AB []])
+            let (ac, cb) = bond_C [] in
+              let (bc, ca) = bond_C [] in (A [e_B [], ac], B [e_A [], bc], C [ca, cb])
             let (bc, cb) = bond_C [] in
               let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, bc], C [e_AB [], cb])
+            let (bc, ca) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, bc], C [ca, e_AB []])
+            let (ac, cb) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, e_C []], C [e_AB [], cb])
             let (ac, ca) = bond_C [] in
               let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, e_C []], C [ca, e_AB []])
             let (bc, cb) = bond_C [] in
               let (ac, ca) = bond_C [] in
                 let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, bc], C [ca, cb])
             let (ac, cb) = bond_C [] in
-              let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, e_C []], C [e_AB [], cb])
-            let (bc, ca) = bond_C [] in
-              let (ac, cb) = bond_C [] in
+              let (bc, ca) = bond_C [] in
                 let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, bc], C [ca, cb])
             let (bc#2, cb) = bond_C [] in
               let (bc#1, ca) = bond_C [] in (B [e_A [], bc#1], B [e_A [], bc#2], C [ca, cb])
-            let (bc#2, ca) = bond_C [] in
-              let (bc#1, cb) = bond_C [] in (B [e_A [], bc#1], B [e_A [], bc#2], C [ca, cb])"#]];
+            let (bc#1, cb) = bond_C [] in
+              let (bc#2, ca) = bond_C [] in (B [e_A [], bc#1], B [e_A [], bc#2], C [ca, cb])"#]];
         species.assert_eq(&generator.species(3).join("\n"));
 
         let transitions = expect![[r#"
@@ -550,16 +550,21 @@ mod tests {
               → let [bc, cb] = bond [] in
                 let [ac, ca] = bond [] in
                   (let [ab, ba] = bond [] in (A [ab, c], B [ba, c]), C [ca, cb])
-            let (cb#1, ca#2) = bond_C [] in
-                (C [e_AB [], cb#1], R_dimerization [ca#2, e_C []])
-              : let (cb#1, ca#2) = bond_C [] in (C [e_AB [], cb#1], (A [e_B], B [e_A]))
-              → let (cb#1, ca#2) = bond_C [] in
-                (C [e_AB [], cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
             let (cb#1, cb#2) = bond_C [] in
                 (C [e_AB [], cb#1], R_dimerization [e_C [], cb#2])
               : let (cb#1, cb#2) = bond_C [] in (C [e_AB [], cb#1], (A [e_B], B [e_A]))
               → let (cb#1, cb#2) = bond_C [] in
                 (C [e_AB [], cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (cb#1, ca#2) = bond_C [] in
+                (C [e_AB [], cb#1], R_dimerization [ca#2, e_C []])
+              : let (cb#1, ca#2) = bond_C [] in (C [e_AB [], cb#1], (A [e_B], B [e_A]))
+              → let (cb#1, ca#2) = bond_C [] in
+                (C [e_AB [], cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (ca#1, cb#2) = bond_C [] in
+                (C [ca#1, e_AB []], R_dimerization [e_C [], cb#2])
+              : let (ca#1, cb#2) = bond_C [] in (C [ca#1, e_AB []], (A [e_B], B [e_A]))
+              → let (ca#1, cb#2) = bond_C [] in
+                (C [ca#1, e_AB []], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
             let (ca#1, ca#2) = bond_C [] in
                 (C [ca#1, e_AB []], R_dimerization [ca#2, e_C []])
               : let (ca#1, ca#2) = bond_C [] in (C [ca#1, e_AB []], (A [e_B], B [e_A]))
@@ -574,17 +579,12 @@ mod tests {
                 let (ca#1, ca#2) = bond_C [] in
                   (C [ca#1, cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
             let (ca#1, cb#2) = bond_C [] in
-                (C [ca#1, e_AB []], R_dimerization [e_C [], cb#2])
-              : let (ca#1, cb#2) = bond_C [] in (C [ca#1, e_AB []], (A [e_B], B [e_A]))
-              → let (ca#1, cb#2) = bond_C [] in
-                (C [ca#1, e_AB []], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
-            let (cb#1, ca#2) = bond_C [] in
-                let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in
                   (C [ca#1, cb#1], R_dimerization [ca#2, cb#2])
-              : let (cb#1, ca#2) = bond_C [] in
-                let (ca#1, cb#2) = bond_C [] in (C [ca#1, cb#1], (A [e_B], B [e_A]))
-              → let (cb#1, ca#2) = bond_C [] in
-                let (ca#1, cb#2) = bond_C [] in
+              : let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in (C [ca#1, cb#1], (A [e_B], B [e_A]))
+              → let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in
                   (C [ca#1, cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
     }
@@ -1242,14 +1242,15 @@ mod tests {
             A [e_sh2 []]
             C [u [e_xtyr []]]
             C [p [e_xtyr []]]
-            let [s1, s2] = bond [] in (A [s1], C [p [s2]])"#]]; // @Evan, do you know why this complex is not generated? It appears in the RHS of the last transition.
+            let (x, ##xtyr#1) = bond [] in (A [x], C [u [##xtyr#1]])
+            let (x, ##xtyr#1) = bond [] in (A [x], C [p [##xtyr#1]])"#]];
         species.assert_eq(&generator.species(4).join("\n"));
 
         let transitions = expect![[r#"
             R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
             R_dimerization []
               : (A [e_sh2], C [p e_xtyr []])
-              → let [s1, s2] = bond [] in (A [s1], C [p s2 []])"#]];
+              → let [s1, s2] = bond [] in (A [s1], C [p [s2]])"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
     }
 }
