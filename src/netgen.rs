@@ -103,7 +103,7 @@ struct SearchState {
     /// Current list of free variables.
     interface: Vec<IntermediateVar>,
 
-    /// Name generator used to create a new free variables.
+    /// Generator of new free variables.
     name_gen: NameGenerator,
 
     /// Current partition of (indexes of) original list of free variables.
@@ -237,20 +237,30 @@ impl<'a> NetGenerator<'a> {
             // as that causes infinite blow-up. Such operations, which include
             // [scalars](https://ncatlab.org/nlab/show/monoidal+category#scalars),
             // also seem pointless, but perhaps they're good for something?
-            if idxs.iter().all(|i| seen.contains(&interface[*i].name)) {
+            if idxs.iter().all(|&i| seen.contains(&interface[i].name)) {
                 continue;
             }
 
             // Get co-applicable operations, bailing early if there are none.
-            let sorts = idxs.iter().map(|i| interface[*i].sort).collect_vec();
+            let sorts = idxs.iter().map(|&i| interface[i].sort).collect_vec();
             let Some(operations) = self.cod_index.get(&sorts).filter(|ops| !ops.is_empty()) else {
                 continue;
             };
 
+            // Mark as seen all free variables up to the last matched variable
+            // (unless they're already eliminated by the match).
+            let mut seen = seen.clone();
+            let last_idx = idxs.iter().max().unwrap();
+            for (i, var) in interface.iter().enumerate().take(last_idx + 1) {
+                if !idxs.contains(&i) {
+                    seen.insert(var.name);
+                }
+            }
+
             // Union components involved in restricting along these indices.
             let mut uf = uf.clone();
             let mut has_merged = false;
-            let mut components = idxs.iter().map(|i| interface[*i].component);
+            let mut components = idxs.iter().map(|&i| interface[i].component);
             let first = components.next().unwrap();
             for component in components {
                 if Rc::make_mut(&mut uf).union(first, component) {
@@ -302,21 +312,10 @@ impl<'a> NetGenerator<'a> {
                     continue;
                 }
 
-                // Mark as seen all free variables up to the last matched
-                // variable (unless they're already eliminated by the match).
-                let mut seen = seen.clone();
-                let last_idx = idxs.iter().max().unwrap();
-                for (i, var) in interface.iter().enumerate().take(last_idx + 1) {
-                    if !idxs.contains(&i) {
-                        seen.insert(var.name);
-                    }
-                }
-
+                let vars = idxs.iter().map(|&i| ObTm::var(interface[i].name));
                 let restrict_at = if matches!(cod, Ty::Sort(_)) {
-                    let i = idxs.iter().exactly_one().unwrap();
-                    ObTm::var(interface[*i].name)
+                    vars.exactly_one().unwrap()
                 } else {
-                    let vars = idxs.iter().map(|i| ObTm::var(interface[*i].name));
                     ObTm::tensor(ObTm::list(vars))
                 };
 
@@ -330,7 +329,7 @@ impl<'a> NetGenerator<'a> {
                     interface,
                     name_gen,
                     uf: uf.clone(),
-                    seen,
+                    seen: seen.clone(),
                 };
                 self.recurse(state, results)
             }

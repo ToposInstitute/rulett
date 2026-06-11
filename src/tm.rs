@@ -9,7 +9,7 @@ use super::{prelude::*, ty::*};
 ///
 /// More precisely, this is an object term sans type. The judgment that an
 /// object term has a type is represented by [`ObTmJudgment`].
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ObTm {
     /// A variable.
     ///
@@ -137,7 +137,7 @@ impl ObTm {
 }
 
 /// Judgment that an object term has a type.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObTmJudgment {
     /// The underlying term.
     pub tm: ObTm,
@@ -188,7 +188,7 @@ impl ObTmJudgment {
 }
 
 /// Morphism term (sans domain term and codomain type).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MorTm {
     /// A variable.
     ///
@@ -324,7 +324,7 @@ impl MorTm {
 /// ("patterns" in Kappa) and indexed morphisms (derived rules) excluding their
 /// (co)domains. In the latter case, we follow the category theorist's tradition
 /// of an identifying an object with its identity morphism.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PatTm {
     /// A restriction of an agent or a basic rule along a morphism.
     ///
@@ -460,7 +460,7 @@ impl PatTm {
 ///
 /// A rule term represents an indexed morphism (derived rule) including its
 /// domain (left-hand side) and codomain (right-hand side).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuleTm {
     /// Term for rule itself.
     pub rule: PatTm,
