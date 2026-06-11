@@ -103,6 +103,9 @@ struct SearchState {
     /// Current list of free variables.
     interface: Vec<IntermediateVar>,
 
+    /// Name generator used to create a new free variables.
+    name_gen: NameGenerator,
+
     /// Current partition of (indexes of) original list of free variables.
     ///
     /// Wrap the union find in `Rc` since we don't have to mutate it at each
@@ -208,6 +211,7 @@ impl<'a> NetGenerator<'a> {
         let state = SearchState {
             tm,
             interface,
+            name_gen: Default::default(),
             uf: Rc::new(QuickUnionUf::new(n)),
             seen: Default::default(),
         };
@@ -217,7 +221,7 @@ impl<'a> NetGenerator<'a> {
     }
 
     fn recurse(&self, state: SearchState, results: &mut Vec<ModelTm>) {
-        let SearchState { interface, tm, uf, seen } = state;
+        let SearchState { interface, tm, name_gen, uf, seen } = state;
 
         // Success condition: found a closed term.
         if interface.is_empty() {
@@ -278,11 +282,12 @@ impl<'a> NetGenerator<'a> {
             for op in operations {
                 let (dom, cod) = self.model.signature().interface(op).unwrap();
 
+                let mut name_gen = name_gen.clone();
                 let mut interface_added = dom
                     .collect_sorts()
                     .into_iter()
                     .map(|sort| {
-                        let name = gen_var_with_sort(&sort);
+                        let name = name_gen.gensym(&sort.to_lowercase());
                         IntermediateVar { name, sort, component }
                     })
                     .collect_vec();
@@ -323,6 +328,7 @@ impl<'a> NetGenerator<'a> {
                 let state = SearchState {
                     tm: tm.restrict(restrict_at, restrict_along),
                     interface,
+                    name_gen,
                     uf: uf.clone(),
                     seen,
                 };
@@ -330,10 +336,6 @@ impl<'a> NetGenerator<'a> {
             }
         }
     }
-}
-
-fn gen_var_with_sort(sort: &Name) -> Name {
-    gensym(&sort.to_lowercase())
 }
 
 #[cfg(test)]
@@ -437,7 +439,7 @@ mod tests {
 
         let species = expect![[r#"
             B [noSite []]
-            let (s#1, ##siteb#3) = bond [] in (A [s#1], B [hasSite [##siteb#3]])"#]];
+            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]];
         species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
     }
 }
