@@ -420,6 +420,17 @@ impl PatTm {
         }
     }
 
+    /// Collect terms in a top-level tensor product.
+    pub fn collect_tensor(self) -> Vec<Self> {
+        match self {
+            PatTm::Tensor(tm) => match *tm {
+                PatTm::List(terms) => terms,
+                _ => vec![PatTm::Tensor(tm)],
+            },
+            _ => vec![self],
+        }
+    }
+
     /// Restricts the pattern term at free variables along a morphism term.
     ///
     /// The codomain of the morphism should equal the type of the object term.
@@ -605,5 +616,14 @@ mod tests {
         expect!["let [x, z] = [a, b] in A [x, b, z]"].assert_eq(&tm.subst(&mut subst).to_string());
         // Stack is restored after substitution.
         assert_eq!(subst.len(), 2);
+    }
+
+    #[test]
+    fn collect_pattern() {
+        let a = PatTm::res("A", [MorTm::app("f", [])]);
+        let b = PatTm::res("B", [MorTm::app("g", [])]);
+        let ab = [a.clone(), b.clone()];
+        assert_eq!(PatTm::tensor(ab.clone()).collect_tensor(), ab);
+        assert_eq!(a.clone().collect_tensor(), vec![a]);
     }
 }
