@@ -231,11 +231,18 @@ pub(crate) fn toy_model_v2() -> Model {
     Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
-/// A toy example of a rule-based model (single agent).
+/// A toy example of a rule-based model (species granularity).
 #[cfg(test)]
-pub(crate) fn toy_model_single_agent() -> Model {
-    let decls = model_decls_single_agent();
-    Model::parse(toy_signature_single_agent(), decls).unwrap()
+pub(crate) fn toy_model_species_granularity_1() -> Model {
+    let decls = model_decls_species_granularity(false);
+    Model::parse(toy_signature_species_granularity_1(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (species granularity).
+#[cfg(test)]
+pub(crate) fn toy_model_species_granularity_2() -> Model {
+    let decls = model_decls_species_granularity(true);
+    Model::parse(toy_signature_species_granularity_2(), decls).unwrap()
 }
 
 /// A toy example of a rule-based model (emergent agent (dimerization of A and B creates C-binding ability)).
@@ -304,7 +311,7 @@ fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> 
 }
 
 #[cfg(test)]
-fn model_decls_single_agent() -> [ModelDecl; 3] {
+fn model_decls_species_granularity(use_b_paralogs: bool) -> [ModelDecl; 3] {
     let re_a = PatTm::res("M", MorTm::var("iota_A"));
     let re_b = PatTm::res("M", MorTm::var("iota_B"));
     let re_k = PatTm::res("M", MorTm::var("iota_K"));
@@ -314,7 +321,10 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
     let res = PatTm::res("M", MorTm::var("iota_Res"));
 
     let a: PatTm = PatTm::tensor([re_a, site_b, res]);
-    let b = PatTm::tensor([re_b, site_a]);
+    let mut b = PatTm::tensor([re_b, site_a]);
+    if use_b_paralogs {
+        b = b.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("b", [])))])
+    }
     let k = PatTm::tensor([re_k]);
 
     let a_phos =
@@ -337,12 +347,22 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
     ]);
     let ab_complex =
         PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), ab_complex); // TODO: ask Evan how to do this
+    let r2_tm = if !use_b_paralogs {
+        ObTm::list([ObTm::var("r")])
+    } else {
+        ObTm::list([ObTm::var("b"), ObTm::var("r")])
+    };
+    let r2_ty = if !use_b_paralogs {
+        Ty::list([Ty::sort("Res")])
+    } else {
+        Ty::list([Ty::sort("ReB"), Ty::sort("Res")])
+    };
     [
         ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
         ModelDecl::rule(
             "bondAB",
-            [ObTm::var("r")],
-            [Ty::sort("Res")],
+            r2_tm,
+            r2_ty,
             PatTm::tensor([
                 a_free.subst(&mut vec![(
                     name("iota_Res"),
@@ -352,7 +372,7 @@ fn model_decls_single_agent() -> [ModelDecl; 3] {
             ]),
             ab_complex
                 .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("r", [])))]),
-        ),
+        ), // TODO: Enable formulation of rules that is agnostic of whether B has paralogs or not.
         ModelDecl::rule(
             "phosphorylate",
             [ObTm::var("s")],
@@ -570,7 +590,7 @@ fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
             ),
         ),
     ]
-} // TODO: Implement this model as preorder (currently `u` and `p` are parallel morphisms)
+} // TODO: Implement this model as preorder (currently `u` and `p` are parallel morphisms); will require enableing LHS and RHS mismatches for phosphorylation rule
 
 #[cfg(test)]
 mod tests {
@@ -632,6 +652,8 @@ mod tests {
             ReMonomer
             ReA
             ReB
+            ReB1
+            ReB2
             ReK
             SiteA
             SiteB
@@ -639,6 +661,8 @@ mod tests {
             #/ operations:
             iota_A : [ReA] → ReMonomer
             iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
             iota_K : [ReK] → ReMonomer
             iota_SiteA : [SiteA] → ReMonomer
             iota_SiteB : [SiteB] → ReMonomer
@@ -646,11 +670,11 @@ mod tests {
             phos : [] → Res
             unphos : [] → Res
             ground_A : [] → ReA
-            ground_B : [] → ReB
             ground_K : [] → ReK
             emptyA : [] → SiteA
             emptyB : [] → SiteB
             bond : [] → ⊗ [SiteA, SiteB]
+            ground_B : [] → ReB
             #/ agents:
             [m] : [ReMonomer] ⊢ M [m]
             #/ rules:
@@ -670,7 +694,57 @@ mod tests {
                 : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
                 → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
         "#]];
-        expected.assert_eq(&toy_model_single_agent().to_string());
+        expected.assert_eq(&toy_model_species_granularity_1().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReB1
+            ReB2
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            ground_B1 : [] → ReB1
+            ground_B2 : [] → ReB2
+            #/ agents:
+            [m] : [ReMonomer] ⊢ M [m]
+            #/ rules:
+            [b, r] : [ReB, Res] ⊢
+              bondAB [b, r]
+                : (
+                  (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA empty [])
+                )
+                → let [s1, s2] = bond [] in
+                  (
+                    (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                    (M iota_B b [], M iota_SiteA s1 [])
+                  )
+            [s] : [SiteB] ⊢
+              phosphorylate [s]
+                : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+        "#]];
+        expected.assert_eq(&toy_model_species_granularity_2().to_string());
 
         let expected = expect![[r#"
             #/ sorts:
