@@ -137,6 +137,34 @@ impl<'a> NetGenerator<'a> {
         Self { model, cod_index }
     }
 
+    /// Generates a network from the model up to a specified size.
+    pub fn net(&self, max_width: usize) -> Net {
+        let (species, transitions): (Vec<_>, Vec<_>) = (1..=max_width)
+            .flat_map(|n| {
+                chain(self.model.agent_names(), self.model.rule_names())
+                    .combinations_with_replacement(n)
+            })
+            .flat_map(|names| self.find(names))
+            .partition_map(|tm| match tm {
+                ModelTm::Pat(pat) => Either::Left(pat),
+                ModelTm::Rule(rule) => Either::Right(rule),
+            });
+
+        let mut net = Net::new();
+        for tm in species {
+            net.add_species(tm);
+        }
+        println!("{net}");
+        for rule in transitions {
+            let src = rule.lhs.factorize().collect_tensor();
+            let tgt = rule.rhs.factorize().collect_tensor();
+            net.add_transition(rule.rule, &src, &tgt)
+                .map_err(|tm| tm.to_string())
+                .expect("Species should already be added");
+        }
+        net
+    }
+
     /// Generates species from the model up to a specified size.
     ///
     /// For definition of *species*, see [`Net`].
@@ -360,10 +388,10 @@ mod tests {
         let transitions = expect![[r#"
             bondAB [unphos []]
               : (A [unphos [], empty []], B [empty []])
-              → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
+              → let (s1, s2) = bond [] in (A [unphos [], s1], B [s2])
             bondAB [phos []]
               : (A [phos [], empty []], B [empty []])
-              → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
+              → let (s1, s2) = bond [] in (A [phos [], s1], B [s2])
             phosphorylate [empty []]
               : (A [unphos [], empty []], K [])
               → (A [phos [], empty []], K [])
@@ -400,11 +428,11 @@ mod tests {
 
         let transitions = expect![[r#"
             bondAB [unphos []]
-              : (A [unphos [], empty []], B [empty []])
-              → let [s1, s2] = bond [] in (A [unphos [], s1], B [s2])
+              : (A [unphos [], emptyA []], B [emptyB []])
+              → let (s1, s2) = bond [] in (A [unphos [], s1], B [s2])
             bondAB [phos []]
-              : (A [phos [], empty []], B [empty []])
-              → let [s1, s2] = bond [] in (A [phos [], s1], B [s2])
+              : (A [phos [], emptyA []], B [emptyB []])
+              → let (s1, s2) = bond [] in (A [phos [], s1], B [s2])
             phosphorylate [emptyA []]
               : (A [unphos [], emptyA []], K [])
               → (A [phos [], emptyA []], K [])
@@ -412,6 +440,10 @@ mod tests {
               : let (s#1, s#2) = bond [] in (B [s#1], (A [unphos [], s#2], K []))
               → let (s#1, s#2) = bond [] in (B [s#1], (A [phos [], s#2], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
+
+        // FIXME: Need to quotient by alpha-equivalence.
+        //let net = expect![[r#""#]];
+        //net.assert_eq(&generator.net(2).to_string());
     }
 
     #[test]

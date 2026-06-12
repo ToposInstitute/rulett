@@ -216,19 +216,19 @@ impl fmt::Display for Model {
 /// A toy example of a ruled-based model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_model_v1() -> Model {
-    let decls = toy_model_decls("Site", "Site");
+    let decls = toy_model_decls("Site", "Site", "empty", "empty");
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
 
 /// A toy example of a ruled-based model (variant 2).
 #[cfg(test)]
 pub(crate) fn toy_model_v2() -> Model {
-    let decls = toy_model_decls("SiteA", "SiteB");
+    let decls = toy_model_decls("SiteA", "SiteB", "emptyA", "emptyB");
     Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
 #[cfg(test)]
-fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
+fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> [ModelDecl; 5] {
     [
         ModelDecl::agent(
             "A",
@@ -242,11 +242,11 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
             [ObTm::var("r")],
             [Ty::sort("Res")],
             PatTm::tensor([
-                PatTm::res("A", [MorTm::var("r"), MorTm::app("empty", [])]),
-                PatTm::res("B", [MorTm::app("empty", [])]),
+                PatTm::res("A", [MorTm::var("r"), MorTm::app(empty_a, [])]),
+                PatTm::res("B", [MorTm::app(empty_b, [])]),
             ]),
             PatTm::let_(
-                [ObTm::var("s1"), ObTm::var("s2")],
+                ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
@@ -294,7 +294,7 @@ mod tests {
             [r] : [Res] ⊢
               bondAB [r]
                 : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+                → let (s1, s2) = bond [] in (A [r, s1], B [s2])
             [s] : [Site] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
@@ -318,8 +318,8 @@ mod tests {
             #/ rules:
             [r] : [Res] ⊢
               bondAB [r]
-                : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+                : (A [r, emptyA []], B [emptyB []])
+                → let (s1, s2) = bond [] in (A [r, s1], B [s2])
             [s] : [SiteA] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
