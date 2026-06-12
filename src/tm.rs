@@ -77,7 +77,7 @@ impl ObTm {
     ///
     /// Returns an error when the term is ill-formed or ill-typed.
     pub fn check(&self, ty: &Ty) -> Result<(), String> {
-        self.collect_vars()
+        self.vars()
             .map_err(|name| format!("variable {name} used twice"))
             .and_then(|_| self.check_types(ty))
     }
@@ -111,9 +111,9 @@ impl ObTm {
 
     /// Collects all the variables that appear in the term.
     ///
-    /// Returns an error containing the offending name if a variable is
-    /// encountered twice.
-    pub fn collect_vars(&self) -> Result<IndexSet<Name>, Name> {
+    /// In a valid object term, no variable is repeated. Returns an error
+    /// containing the offending name if a variable is encountered twice.
+    pub fn vars(&self) -> Result<IndexSet<Name>, Name> {
         fn recurse(vars: &mut IndexSet<Name>, tm: &ObTm) -> Result<(), Name> {
             match tm {
                 ObTm::Var(name) => {
@@ -159,7 +159,7 @@ impl ObTmJudgment {
     /// Collects variable-sort pairs from the judgment.
     ///
     /// Never panics but the result is undefined if the judgment is invalid.
-    pub fn collect_typed_vars(&self) -> IndexMap<Name, Name> {
+    pub fn typed_vars(&self) -> IndexMap<Name, Name> {
         fn recurse(vars: &mut IndexMap<Name, Name>, tm: &ObTm, ty: &Ty) {
             match tm {
                 ObTm::Var(name) => {
@@ -290,6 +290,37 @@ impl MorTm {
         }
     }
 
+    /// Collects the free variables of the term.
+    pub fn free_vars(&self) -> IndexSet<Name> {
+        let (mut vars, mut env) = (IndexSet::new(), IndexSet::new());
+        self.free_vars_recurse(&mut vars, &mut env);
+        vars
+    }
+
+    fn free_vars_recurse(&self, vars: &mut IndexSet<Name>, env: &mut IndexSet<Name>) {
+        match self {
+            MorTm::Var(name) => {
+                if !env.contains(name) {
+                    vars.insert(*name);
+                }
+            }
+            MorTm::List(terms) => {
+                for tm in terms {
+                    tm.free_vars_recurse(vars, env);
+                }
+            }
+            MorTm::Tensor(tm) => tm.free_vars_recurse(vars, env),
+            MorTm::App(_, tm) => tm.free_vars_recurse(vars, env),
+            MorTm::Let { bindings, bound, body } => {
+                bound.free_vars_recurse(vars, env);
+                let prev_len = env.len();
+                env.extend(bindings.vars().unwrap_or_default());
+                body.free_vars_recurse(vars, env);
+                env.truncate(prev_len);
+            }
+        }
+    }
+
     /// Simultaneously substitutes terms for free variables in the term.
     ///
     /// Warning: substitution is not capture-avoiding.
@@ -305,7 +336,7 @@ impl MorTm {
             MorTm::App(name, tm) => MorTm::app(*name, tm.subst(subst)),
             MorTm::Let { bindings, bound, body } => {
                 let new_bound = bound.subst(subst);
-                let shadowed = bindings.collect_vars().unwrap_or_default();
+                let shadowed = bindings.vars().unwrap_or_default();
                 let n = shadowed.len();
                 for &name in &shadowed {
                     subst.push((name, MorTm::var(name)));
@@ -420,7 +451,7 @@ impl PatTm {
         }
     }
 
-    /// Collect terms in a top-level tensor product.
+    /// Collect terms from a tensor product at the top level.
     pub fn collect_tensor(self) -> Vec<Self> {
         match self {
             PatTm::Tensor(tm) => match *tm {
@@ -428,6 +459,32 @@ impl PatTm {
                 _ => vec![PatTm::Tensor(tm)],
             },
             _ => vec![self],
+        }
+    }
+
+    /// Collects the free variables of the pattern term.
+    pub fn free_vars(&self) -> IndexSet<Name> {
+        let (mut vars, mut env) = (IndexSet::new(), IndexSet::new());
+        self.free_vars_recurse(&mut vars, &mut env);
+        vars
+    }
+
+    fn free_vars_recurse(&self, vars: &mut IndexSet<Name>, env: &mut IndexSet<Name>) {
+        match self {
+            PatTm::Res(_, tm) => tm.free_vars_recurse(vars, env),
+            PatTm::List(patterns) => {
+                for tm in patterns {
+                    tm.free_vars_recurse(vars, env);
+                }
+            }
+            PatTm::Tensor(tm) => tm.free_vars_recurse(vars, env),
+            PatTm::Let { bindings, bound, body } => {
+                bound.free_vars_recurse(vars, env);
+                let prev_len = env.len();
+                env.extend(bindings.vars().unwrap_or_default());
+                body.free_vars_recurse(vars, env);
+                env.truncate(prev_len);
+            }
         }
     }
 
@@ -454,7 +511,7 @@ impl PatTm {
             PatTm::Tensor(pattern) => PatTm::tensor(pattern.subst(subst)),
             PatTm::Let { bindings, bound, body } => {
                 let new_bound = bound.subst(subst);
-                let shadowed = bindings.collect_vars().unwrap_or_default();
+                let shadowed = bindings.vars().unwrap_or_default();
                 let n = shadowed.len();
                 for &name in &shadowed {
                     subst.push((name, MorTm::var(name)));
@@ -463,6 +520,56 @@ impl PatTm {
                 subst.truncate(subst.len() - n);
                 PatTm::let_(bindings.clone(), new_bound, new_body)
             }
+        }
+    }
+
+    /// Factorizes the pattern by pushing let bindings into (tensors of) lists.
+    ///
+    /// A let binding is pushed into a list when exactly one item refers to any
+    /// of the bound variables. (Since this is linear type theory, if the term
+    /// is valid, this item will then use each bound variable exactly once.)
+    pub fn factorize(self) -> Self {
+        match self {
+            PatTm::Res(_, _) => self,
+            PatTm::List(patterns) => {
+                PatTm::List(patterns.into_iter().map(Self::factorize).collect())
+            }
+            PatTm::Tensor(tm) => PatTm::Tensor(Box::new(tm.factorize())),
+            PatTm::Let { bindings, bound, body } => {
+                Self::factorize_let(bindings, bound, body.factorize())
+            }
+        }
+    }
+
+    fn factorize_let(bindings: ObTm, bound: MorTm, body: PatTm) -> PatTm {
+        /// Returns the unique term, if any, using any of the given variables.
+        fn unique_user(terms: &[PatTm], vars: &IndexSet<Name>) -> Option<usize> {
+            terms
+                .iter()
+                .enumerate()
+                .filter_map(|(i, tm)| {
+                    let tm_vars = tm.free_vars();
+                    vars.iter().any(|v| tm_vars.contains(v)).then_some(i)
+                })
+                .exactly_one()
+                .ok()
+        }
+
+        match body {
+            PatTm::Tensor(inner) if matches!(&*inner, PatTm::List(_)) => {
+                PatTm::Tensor(Box::new(Self::factorize_let(bindings, bound, *inner)))
+            }
+            PatTm::List(mut terms) => {
+                let binding_vars = bindings.vars().unwrap_or_default();
+                if let Some(i) = unique_user(&terms, &binding_vars) {
+                    let tm = std::mem::replace(&mut terms[i], PatTm::List(vec![]));
+                    terms[i] = Self::factorize_let(bindings, bound, tm);
+                    PatTm::list(terms)
+                } else {
+                    PatTm::let_(bindings, bound, PatTm::list(terms))
+                }
+            }
+            other => PatTm::let_(bindings, bound, other),
         }
     }
 }
@@ -625,5 +732,48 @@ mod tests {
         let ab = [a.clone(), b.clone()];
         assert_eq!(PatTm::tensor(ab.clone()).collect_tensor(), ab);
         assert_eq!(a.clone().collect_tensor(), vec![a]);
+    }
+
+    #[test]
+    fn factorize_pattern() {
+        let tm = PatTm::let_(
+            ObTm::tensor(ObTm::list([ObTm::var("x"), ObTm::var("y")])),
+            MorTm::app("f", []),
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("x"), MorTm::var("y")]),
+                PatTm::res("B", []),
+            ]),
+        );
+        let expected = expect!["(let (x, y) = f [] in A [x, y], B [])"];
+        expected.assert_eq(&tm.factorize().to_string());
+
+        fn bind(body: PatTm) -> PatTm {
+            PatTm::let_(
+                ObTm::var("x"),
+                MorTm::app("f", []),
+                PatTm::let_(ObTm::var("y"), MorTm::app("g", []), body),
+            )
+        }
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::var("x"), MorTm::var("y")]),
+            PatTm::res("B", []),
+        ]));
+        let expected = expect!["(let x = f [] in let y = g [] in A [x, y], B [])"];
+        expected.assert_eq(&tm.factorize().to_string());
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::var("x")]),
+            PatTm::res("B", [MorTm::var("y")]),
+        ]));
+        let expected = expect!["(let x = f [] in A [x], let y = g [] in B [y])"];
+        expected.assert_eq(&tm.factorize().to_string());
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::var("y")]),
+            PatTm::res("B", [MorTm::var("x")]),
+        ]));
+        let expected = expect!["(let y = g [] in A [y], let x = f [] in B [x])"];
+        expected.assert_eq(&tm.factorize().to_string());
     }
 }

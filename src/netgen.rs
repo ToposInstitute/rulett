@@ -128,7 +128,7 @@ impl<'a> NetGenerator<'a> {
     pub fn new(model: &'a Model) -> Self {
         let mut cod_index = HashMap::<_, Vec<_>>::new();
         for (name, _, cod) in model.signature().operations() {
-            let sorts = cod.collect_sorts();
+            let sorts = cod.sorts();
             let n = sorts.len();
             for ordering in sorts.into_iter().permutations(n).unique() {
                 cod_index.entry(ordering).or_default().push(name);
@@ -169,7 +169,7 @@ impl<'a> NetGenerator<'a> {
         // Collect all variables, then ensure they are unique.
         let (mut generator_sorts, mut variables) = (Vec::new(), Vec::new());
         for name in &generator_names {
-            let interface = self.model.interface(name).unwrap().collect_typed_vars();
+            let interface = self.model.interface(name).unwrap().typed_vars();
 
             // Degenerate case: if a generator's interface is empty, exit early
             // since any non-trivial product with the generator is decomposable.
@@ -294,7 +294,7 @@ impl<'a> NetGenerator<'a> {
 
                 let mut name_gen = name_gen.clone();
                 let mut interface_added = dom
-                    .collect_sorts()
+                    .sorts()
                     .into_iter()
                     .map(|sort| {
                         let name = name_gen.gensym(&sort.to_lowercase());

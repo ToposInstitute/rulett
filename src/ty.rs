@@ -120,7 +120,7 @@ impl Ty {
     }
 
     /// Collects all the sorts that appear in the type.
-    pub fn collect_sorts(&self) -> Vec<Name> {
+    pub fn sorts(&self) -> Vec<Name> {
         fn recurse(sorts: &mut Vec<Name>, ty: &Ty) {
             match ty {
                 Ty::Sort(name) => sorts.push(*name),
@@ -177,15 +177,15 @@ mod tests {
     #[test]
     fn collect_sorts() {
         // Sorts.
-        assert_eq!(Ty::sort("X").collect_sorts(), vec![name("X")]);
+        assert_eq!(Ty::sort("X").sorts(), vec![name("X")]);
 
         // Lists.
         let ty = Ty::list([Ty::sort("X"), Ty::sort("Y"), Ty::sort("X")]);
-        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y"), name("X")]);
+        assert_eq!(ty.sorts(), vec![name("X"), name("Y"), name("X")]);
 
         // Tensors.
         let ty = Ty::tensor([Ty::sort("X"), Ty::sort("Y")]);
-        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y")]);
+        assert_eq!(ty.sorts(), vec![name("X"), name("Y")]);
     }
 
     #[test]

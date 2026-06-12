@@ -181,7 +181,7 @@ impl Model {
     /// Constructs a rule term corresponding to a basic rule.
     pub(crate) fn rule_tm(&self, name: Name, terms: Vec<MorTm>) -> RuleTm {
         let BasicRuleData { interface, lhs, rhs } = self.rules.get(&name).unwrap();
-        let vars = interface.tm.collect_vars().unwrap();
+        let vars = interface.tm.vars().unwrap();
         let mut subst = zip_eq(vars, terms.iter().cloned()).collect_vec();
         RuleTm {
             rule: PatTm::Res(name, MorTm::List(terms)),
