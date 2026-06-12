@@ -4,7 +4,7 @@ use itertools::{chain, zip_eq};
 use std::rc::Rc;
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
-use super::{model::*, prelude::*, tm::*, ty::*};
+use super::{model::*, net::*, prelude::*, tm::*, ty::*};
 
 /// Wrapper enum for the two kinds of terms in a model.
 ///
@@ -139,9 +139,7 @@ impl<'a> NetGenerator<'a> {
 
     /// Generates species from the model up to a specified size.
     ///
-    /// A *closed pattern* is a pattern with trivial interface. A *species* is
-    /// an indecomposable closed pattern, i.e., a closed pattern that cannot be
-    /// expressed as a non-trivial product of other closed patterns.
+    /// For definition of *species*, see [`Net`].
     pub fn species(&self, max_agents: usize) -> impl Iterator<Item = PatTm> {
         (1..=max_agents)
             .flat_map(|n| self.model.agent_names().combinations_with_replacement(n))
@@ -151,9 +149,7 @@ impl<'a> NetGenerator<'a> {
 
     /// Generates transitions from the model up to a specified size.
     ///
-    /// A *closed rule* is a derived rule with trivial interface. A *transition*
-    /// is an indecomposable closed rule, i.e., a closed rule that cannot be
-    /// expressed as a nontrivial composite or product of other closed rules.
+    /// For the definition of *transition*, see [`Net`].
     pub fn transitions(&self, max_rules: usize) -> impl Iterator<Item = RuleTm> {
         (1..=max_rules)
             .flat_map(|n| {

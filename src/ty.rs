@@ -9,7 +9,7 @@ use super::prelude::*;
 ///
 /// The (meta) type of a [type](Ty) is a kind. In double-categorical logic,
 /// kinds correspond to object types in the double theory.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// The base or primitive kind, often denoted `*`.
     Prim,
@@ -64,7 +64,7 @@ impl Kind {
 ///
 /// In double-categorical logic, types correspond to objects in a model of the
 /// double theory.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ty {
     /// A primitive type, aka a sort, belonging to the signature.
     Sort(Name),
