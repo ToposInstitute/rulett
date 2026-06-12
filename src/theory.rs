@@ -163,6 +163,25 @@ impl fmt::Display for Signature {
     }
 }
 
+#[cfg(test)]
+/// Function to merge two signatures
+fn merge_signatures(sigs: &[Signature]) -> Signature {
+    let mut merged = Signature::new();
+    for sig in sigs {
+        for sort in sig.sorts() {
+            if !merged.sorts().any(|s| s == sort) {
+                merged.add_sort(sort).unwrap();
+            }
+        }
+        for (op, dom, cod) in sig.operations() {
+            if merged.interface(&op).is_none() {
+                merged.add_operation(op, dom.clone(), cod.clone()).unwrap();
+            }
+        }
+    }
+    merged
+}
+
 /// Signature for a toy model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_signature_v1() -> Signature {
@@ -200,12 +219,16 @@ pub(crate) fn toy_signature_single_agent() -> Signature {
         SignatureDecl::sort("ReMonomer"),
         SignatureDecl::sort("ReA"),
         SignatureDecl::sort("ReB"),
+        SignatureDecl::sort("ReB1"),
+        SignatureDecl::sort("ReB2"),
         SignatureDecl::sort("ReK"),
         SignatureDecl::sort("SiteA"),
         SignatureDecl::sort("SiteB"),
         SignatureDecl::sort("Res"),
         SignatureDecl::operation("iota_A", [Ty::sort("ReA")], Ty::sort("ReMonomer")),
         SignatureDecl::operation("iota_B", [Ty::sort("ReB")], Ty::sort("ReMonomer")),
+        SignatureDecl::operation("iota_B1", [Ty::sort("ReB1")], Ty::sort("ReB")),
+        SignatureDecl::operation("iota_B2", [Ty::sort("ReB2")], Ty::sort("ReB")),
         SignatureDecl::operation("iota_K", [Ty::sort("ReK")], Ty::sort("ReMonomer")),
         SignatureDecl::operation("iota_SiteA", [Ty::sort("SiteA")], Ty::sort("ReMonomer")),
         SignatureDecl::operation("iota_SiteB", [Ty::sort("SiteB")], Ty::sort("ReMonomer")),
@@ -213,13 +236,48 @@ pub(crate) fn toy_signature_single_agent() -> Signature {
         SignatureDecl::operation("phos", [], Ty::sort("Res")),
         SignatureDecl::operation("unphos", [], Ty::sort("Res")),
         SignatureDecl::operation("ground_A", [], Ty::sort("ReA")),
-        SignatureDecl::operation("ground_B", [], Ty::sort("ReB")),
         SignatureDecl::operation("ground_K", [], Ty::sort("ReK")),
         SignatureDecl::operation("emptyA", [], Ty::sort("SiteA")),
         SignatureDecl::operation("emptyB", [], Ty::sort("SiteB")),
         SignatureDecl::operation("bond", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
     ])
     .unwrap()
+}
+
+#[cfg(test)]
+fn toy_signature_one_b() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("ReB"),
+        SignatureDecl::operation("ground_B", [], Ty::sort("ReB")),
+    ])
+    .unwrap()
+}
+
+#[cfg(test)]
+fn toy_signature_two_b() -> Signature {
+    Signature::parse([
+        SignatureDecl::sort("ReB1"),
+        SignatureDecl::sort("ReB2"),
+        SignatureDecl::operation("ground_B1", [], Ty::sort("ReB1")),
+        SignatureDecl::operation("ground_B2", [], Ty::sort("ReB2")),
+    ])
+    .unwrap()
+}
+
+/// Signature for a toy model (species granularity).
+#[cfg(test)]
+pub(crate) fn toy_signature_species_granularity_1() -> Signature {
+    let sig1 = toy_signature_single_agent();
+    let sig2 = toy_signature_one_b();
+    merge_signatures(&[sig1, sig2])
+}
+
+/// Signature for a toy model (species granularity).
+#[cfg(test)]
+pub(crate) fn toy_signature_species_granularity_2() -> Signature {
+    let sig1 = toy_signature_single_agent();
+    let sig2 = toy_signature_two_b();
+    merge_signatures(&[sig1, sig2])
 }
 
 /// Signature for a toy model (emergent agent (dimerization of A and B creates C-binding ability)).
@@ -269,7 +327,7 @@ pub(crate) fn toy_signature_directionality() -> Signature {
     .unwrap()
 }
 
-/// Signature for a toy model (phospho tyrosine). See also https://github.com/ToposInstitute/sys-bio-collab/discussions/8
+/// Signature for a toy model (phospho tyrosine).
 #[cfg(test)]
 pub(crate) fn toy_signature_phospho_tyrosine() -> Signature {
     Signature::parse([
@@ -323,6 +381,8 @@ mod tests {
             ReMonomer
             ReA
             ReB
+            ReB1
+            ReB2
             ReK
             SiteA
             SiteB
@@ -330,6 +390,8 @@ mod tests {
             #/ operations:
             iota_A : [ReA] → ReMonomer
             iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
             iota_K : [ReK] → ReMonomer
             iota_SiteA : [SiteA] → ReMonomer
             iota_SiteB : [SiteB] → ReMonomer
@@ -337,13 +399,45 @@ mod tests {
             phos : [] → Res
             unphos : [] → Res
             ground_A : [] → ReA
-            ground_B : [] → ReB
             ground_K : [] → ReK
             emptyA : [] → SiteA
             emptyB : [] → SiteB
             bond : [] → ⊗ [SiteA, SiteB]
+            ground_B : [] → ReB
         "#]];
-        expected.assert_eq(&toy_signature_single_agent().to_string());
+        expected.assert_eq(&toy_signature_species_granularity_1().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReB1
+            ReB2
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            ground_B1 : [] → ReB1
+            ground_B2 : [] → ReB2
+        "#]];
+        expected.assert_eq(&toy_signature_species_granularity_2().to_string());
 
         let expected = expect![[r#"
             #/ sorts:

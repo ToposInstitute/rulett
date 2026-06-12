@@ -443,8 +443,8 @@ mod tests {
     }
 
     #[test]
-    fn toy_model_single_agent() {
-        let model = model::toy_model_single_agent();
+    fn toy_model_species_granularity_1() {
+        let model = model::toy_model_species_granularity_1();
         let generator = NetGenerator::new(&model);
 
         let species = expect![[r#"
@@ -481,6 +481,84 @@ mod tests {
                 (
                   (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
                   (M iota_B, M iota_SiteA s1 [])
+                )
+            phosphorylate [emptyB []]
+              : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+              → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+            let (s, ##sitea#1) = bond [] in (M [iota_SiteA [##sitea#1]], phosphorylate [s])
+              : let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                )
+              → let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+                )"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
+    }
+
+    #[test]
+    fn toy_model_species_granularity_2() {
+        let model = model::toy_model_species_granularity_2();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            M [iota_A [ground_A []]]
+            M [iota_B [iota_B1 [ground_B1 []]]]
+            M [iota_B [iota_B2 [ground_B2 []]]]
+            M [iota_K [ground_K []]]
+            M [iota_SiteA [emptyA []]]
+            M [iota_SiteB [emptyB []]]
+            M [iota_Res [phos []]]
+            M [iota_Res [unphos []]]
+            let (##sitea#1, ##siteb#1) = bond [] in
+              (M [iota_SiteA [##sitea#1]], M [iota_SiteB [##siteb#1]])
+            let (##siteb#1, ##sitea#1) = bond [] in
+              (M [iota_SiteB [##siteb#1]], M [iota_SiteA [##sitea#1]])"#]];
+        species.assert_eq(&generator.species(2).join("\n"));
+
+        let transitions = expect![[r#"
+            bondAB [iota_B1 [ground_B1 []], phos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B1 [ground_B1 []], unphos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B2 [ground_B2 []], phos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B2 [ground_B2 []], unphos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
                 )
             phosphorylate [emptyB []]
               : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
