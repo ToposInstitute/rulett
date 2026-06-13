@@ -311,7 +311,7 @@ fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> 
 }
 
 #[cfg(test)]
-fn model_decls_species_granularity(use_b_paralogs: bool) -> [ModelDecl; 3] {
+fn model_decls_species_granularity() -> [ModelDecl; 3] {
     let re_a = PatTm::res("M", MorTm::var("iota_A"));
     let re_b = PatTm::res("M", MorTm::var("iota_B"));
     let re_k = PatTm::res("M", MorTm::var("iota_K"));
