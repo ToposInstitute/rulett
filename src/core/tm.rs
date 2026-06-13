@@ -3,7 +3,7 @@
 use pretty::RcDoc;
 use std::fmt;
 
-use crate::prelude::*;
+use crate::{ob_tm::*, prelude::*};
 
 /// A segment of a path into the structure bound by a let binding.
 ///
@@ -41,7 +41,7 @@ pub enum MorTm {
     App(Name, Box<MorTm>),
 
     /// A let binding.
-    Let { bound: Box<MorTm>, body: Box<MorTm> }
+    Let { bound: Box<MorTm>, body: Box<MorTm> },
 }
 
 impl fmt::Display for MorTm {
@@ -112,6 +112,50 @@ impl MorTm {
             body: Box::new(body.into()),
         }
     }
+
+    /// Simultaneously substitutes terms for free variables in the term.
+    ///
+    /// Capture-avoiding due to the locally nameless representation.
+    pub fn subst(&self, subst: &[(Name, MorTm)]) -> Self {
+        match self {
+            MorTm::FVar(name) => subst
+                .iter()
+                .rev()
+                .find_map(|(n, tm)| (n == name).then(|| tm.clone()))
+                .unwrap_or_else(|| self.clone()),
+            MorTm::BVar(..) => self.clone(),
+            MorTm::List(terms) => MorTm::list(terms.iter().map(|t| t.subst(subst))),
+            MorTm::Tensor(tm) => MorTm::tensor(tm.subst(subst)),
+            MorTm::App(name, tm) => MorTm::app(*name, tm.subst(subst)),
+            MorTm::Let { bound, body } => MorTm::let_(bound.subst(subst), body.subst(subst)),
+        }
+    }
+
+    /// Binds free variables with a `let in` expression.
+    pub fn bind(self, bindings: &ObTm, bound: MorTm) -> Self {
+        MorTm::let_(bound, self.close(bindings))
+    }
+
+    /// Closes over free variables by turning them into bound variables.
+    pub fn close(self, bindings: &ObTm) -> Self {
+        self.close_rec(&binding_paths(bindings), 0)
+    }
+
+    fn close_rec(self, paths: &IndexMap<Name, Vec<BVarSegment>>, depth: usize) -> Self {
+        match self {
+            MorTm::FVar(name) => match paths.get(&name) {
+                Some(path) => MorTm::BVar(depth, path.clone()),
+                None => MorTm::FVar(name),
+            },
+            bvar @ MorTm::BVar(..) => bvar,
+            MorTm::List(terms) => MorTm::list(terms.into_iter().map(|t| t.close_rec(paths, depth))),
+            MorTm::Tensor(tm) => MorTm::tensor(tm.close_rec(paths, depth)),
+            MorTm::App(name, tm) => MorTm::app(name, tm.close_rec(paths, depth)),
+            MorTm::Let { bound, body } => {
+                MorTm::let_(bound.close_rec(paths, depth), body.close_rec(paths, depth + 1))
+            }
+        }
+    }
 }
 
 /// Renders a bound variable as a string.
@@ -127,6 +171,36 @@ fn bvar_string(index: usize, path: &[BVarSegment]) -> String {
         .join(".")
 }
 
+/// Maps each variable in a binding structure to the path that reaches it.
+fn binding_paths(bindings: &ObTm) -> IndexMap<Name, Vec<BVarSegment>> {
+    fn recurse(
+        bindings: &ObTm,
+        prefix: &mut Vec<BVarSegment>,
+        paths: &mut IndexMap<Name, Vec<BVarSegment>>,
+    ) {
+        match bindings {
+            ObTm::Var(name) => {
+                paths.insert(*name, prefix.clone());
+            }
+            ObTm::List(terms) => {
+                for (i, tm) in terms.iter().enumerate() {
+                    prefix.push(BVarSegment::List(i));
+                    recurse(tm, prefix, paths);
+                    prefix.pop();
+                }
+            }
+            ObTm::Tensor(tm) => {
+                prefix.push(BVarSegment::Tensor);
+                recurse(tm, prefix, paths);
+                prefix.pop();
+            }
+        }
+    }
+    let mut paths = IndexMap::new();
+    recurse(bindings, &mut Vec::new(), &mut paths);
+    paths
+}
+
 /// Pattern term.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PatTm {
@@ -140,7 +214,7 @@ pub enum PatTm {
     Tensor(Box<PatTm>),
 
     /// A let binding.
-    Let { bound: MorTm, body: Box<PatTm> }
+    Let { bound: MorTm, body: Box<PatTm> },
 }
 
 impl fmt::Display for PatTm {
@@ -199,6 +273,52 @@ impl PatTm {
             body: Box::new(body.into()),
         }
     }
+
+    /// Simultaneously substitutes terms for free variables in the pattern.
+    ///
+    /// Capture-avoiding due to the locally nameless representation.
+    pub fn subst(&self, subst: &[(Name, MorTm)]) -> Self {
+        match self {
+            PatTm::Res(name, tm) => PatTm::res(*name, tm.subst(subst)),
+            PatTm::List(patterns) => PatTm::list(patterns.iter().map(|p| p.subst(subst))),
+            PatTm::Tensor(pattern) => PatTm::tensor(pattern.subst(subst)),
+            PatTm::Let { bound, body } => PatTm::let_(bound.subst(subst), body.subst(subst)),
+        }
+    }
+
+    /// Restricts the pattern term at free variables along a morphism term.
+    ///
+    /// The codomain of the morphism should equal the type of the object term.
+    pub fn restrict(self, at: &ObTm, along: MorTm) -> Self {
+        if let ObTm::Var(var) = at {
+            self.subst(&[(*var, along)])
+        } else {
+            self.bind(at, along)
+        }
+    }
+
+    /// Binds free variables with a `let in` expression.
+    pub fn bind(self, bindings: &ObTm, bound: MorTm) -> Self {
+        PatTm::let_(bound, self.close(bindings))
+    }
+
+    /// Closes over free variables by turning them into bound variables.
+    pub fn close(self, bindings: &ObTm) -> Self {
+        self.close_rec(&binding_paths(bindings), 0)
+    }
+
+    fn close_rec(self, paths: &IndexMap<Name, Vec<BVarSegment>>, depth: usize) -> Self {
+        match self {
+            PatTm::Res(name, tm) => PatTm::res(name, tm.close_rec(paths, depth)),
+            PatTm::List(patterns) => {
+                PatTm::list(patterns.into_iter().map(|p| p.close_rec(paths, depth)))
+            }
+            PatTm::Tensor(pattern) => PatTm::tensor(pattern.close_rec(paths, depth)),
+            PatTm::Let { bound, body } => {
+                PatTm::let_(bound.close_rec(paths, depth), body.close_rec(paths, depth + 1))
+            }
+        }
+    }
 }
 
 /// Pretty document for `let <bound> in <body>`, breakable after `in`.
@@ -208,4 +328,63 @@ fn let_doc<'a>(bound: RcDoc<'a>, body: RcDoc<'a>) -> RcDoc<'a> {
         .append(RcDoc::text(" in"))
         .append(RcDoc::line().append(body).nest(2))
         .group()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use expect_test::expect;
+
+    #[test]
+    fn subst_mor() {
+        // Free variables.
+        let subst = vec![(name("x"), MorTm::app("f", MorTm::fvar("a")))];
+        expect!["f a"].assert_eq(&MorTm::fvar("x").subst(&subst).to_string());
+        expect!["y"].assert_eq(&MorTm::fvar("y").subst(&subst).to_string());
+
+        // Lists, applications, etc.
+        let tm = MorTm::app("g", [MorTm::fvar("x"), MorTm::fvar("y")]);
+        expect!["g [f a, y]"].assert_eq(&tm.subst(&subst).to_string());
+
+        // Let bindings.
+        let subst = vec![(name("x"), MorTm::fvar("a")), (name("y"), MorTm::fvar("b"))];
+        let tm = MorTm::let_(
+            [MorTm::fvar("x"), MorTm::fvar("y")],
+            [
+                MorTm::bvar(0, [BVarSegment::List(0)]),
+                MorTm::fvar("y"),
+                MorTm::bvar(0, [BVarSegment::List(1)]),
+            ],
+        );
+        expect!["let [x, y] in [0.0, y, 0.1]"].assert_eq(&tm.to_string());
+        expect!["let [a, b] in [0.0, b, 0.1]"].assert_eq(&tm.subst(&subst).to_string());
+    }
+
+    #[test]
+    fn subst_pattern() {
+        let subst = vec![(name("x"), MorTm::app("f", MorTm::fvar("a")))];
+        let tm = PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("x")]),
+            PatTm::res("B", [MorTm::fvar("y")]),
+        ]);
+        expect!["(A [x], B [y])"].assert_eq(&tm.to_string());
+        expect!["(A [f a], B [y])"].assert_eq(&tm.subst(&subst).to_string());
+    }
+
+    #[test]
+    fn bind_pattern() {
+        // Binding a binary tensor product.
+        let tm = PatTm::res("A", [MorTm::fvar("x"), MorTm::fvar("y")]);
+        let bound = tm.bind(&ObTm::tensor([ObTm::var("x"), ObTm::var("y")]), MorTm::app("f", []));
+        expect!["let f [] in A [0.0, 0.1]"].assert_eq(&bound.to_string());
+
+        // Nested binding.
+        let tm = PatTm::let_(
+            MorTm::app("g", []),
+            PatTm::res("A", [MorTm::fvar("x"), MorTm::bvar(0, [])]),
+        );
+        expect!["let g [] in A [x, 0]"].assert_eq(&tm.to_string());
+        let bound = tm.bind(&ObTm::var("x"), MorTm::app("f", []));
+        expect!["let f [] in let g [] in A [1, 0]"].assert_eq(&bound.to_string());
+    }
 }

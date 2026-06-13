@@ -672,11 +672,8 @@ mod tests {
         expect!["x"].assert_eq(&MorTm::var("x").elab().to_string());
 
         // A single binding binds at index 0; other variables remain free.
-        let tm = MorTm::let_(
-            ObTm::var("x"),
-            MorTm::app("f", []),
-            [MorTm::var("x"), MorTm::var("y")],
-        );
+        let tm =
+            MorTm::let_(ObTm::var("x"), MorTm::app("f", []), [MorTm::var("x"), MorTm::var("y")]);
         expect!["let f [] in [0, y]"].assert_eq(&tm.elab().to_string());
 
         // A list destructure indexes into the binding by position.
