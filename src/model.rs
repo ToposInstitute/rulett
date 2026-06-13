@@ -230,14 +230,14 @@ pub(crate) fn toy_model_v2() -> Model {
 /// A toy example of a rule-based model (species granularity).
 #[cfg(test)]
 pub(crate) fn toy_model_species_granularity_1() -> Model {
-    let decls = model_decls_species_granularity(false);
+    let decls = model_decls_species_granularity();
     Model::parse(toy_signature_species_granularity_1(), decls).unwrap()
 }
 
 /// A toy example of a rule-based model (species granularity).
 #[cfg(test)]
 pub(crate) fn toy_model_species_granularity_2() -> Model {
-    let decls = model_decls_species_granularity(true);
+    let decls = model_decls_species_granularity();
     Model::parse(toy_signature_species_granularity_2(), decls).unwrap()
 }
 
