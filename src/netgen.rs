@@ -462,25 +462,25 @@ mod tests {
         species.assert_eq(&generator.species(2).join("\n"));
 
         let transitions = expect![[r#"
-            bondAB [phos []]
+            bondAB [ground_B [], phos []]
               : (
                 (M iota_A, M iota_SiteB empty [], M iota_Res r []),
-                (M iota_B, M iota_SiteA empty [])
+                (M iota_B b [], M iota_SiteA empty [])
               )
               → let [s1, s2] = bond [] in
                 (
                   (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
-                  (M iota_B, M iota_SiteA s1 [])
+                  (M iota_B b [], M iota_SiteA s1 [])
                 )
-            bondAB [unphos []]
+            bondAB [ground_B [], unphos []]
               : (
                 (M iota_A, M iota_SiteB empty [], M iota_Res r []),
-                (M iota_B, M iota_SiteA empty [])
+                (M iota_B b [], M iota_SiteA empty [])
               )
               → let [s1, s2] = bond [] in
                 (
                   (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
-                  (M iota_B, M iota_SiteA s1 [])
+                  (M iota_B b [], M iota_SiteA s1 [])
                 )
             phosphorylate [emptyB []]
               : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))

@@ -316,10 +316,8 @@ fn model_decls_species_granularity(use_b_paralogs: bool) -> [ModelDecl; 3] {
     let res = PatTm::res("M", MorTm::var("iota_Res"));
 
     let a: PatTm = PatTm::tensor([re_a, site_b, res]);
-    let mut b = PatTm::tensor([re_b, site_a]);
-    if use_b_paralogs {
-        b = b.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("b", [])))])
-    }
+    let b = PatTm::tensor([re_b, site_a]);
+    let b = b.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("b", [])))]);
     let k = PatTm::tensor([re_k]);
 
     let a_phos =
@@ -342,22 +340,12 @@ fn model_decls_species_granularity(use_b_paralogs: bool) -> [ModelDecl; 3] {
     ]);
     let ab_complex =
         PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), ab_complex); // TODO: ask Evan how to do this
-    let r2_tm = if !use_b_paralogs {
-        ObTm::list([ObTm::var("r")])
-    } else {
-        ObTm::list([ObTm::var("b"), ObTm::var("r")])
-    };
-    let r2_ty = if !use_b_paralogs {
-        Ty::list([Ty::sort("Res")])
-    } else {
-        Ty::list([Ty::sort("ReB"), Ty::sort("Res")])
-    };
     [
         ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
         ModelDecl::rule(
             "bondAB",
-            r2_tm,
-            r2_ty,
+            [ObTm::var("b"), ObTm::var("r")],
+            [Ty::sort("ReB"), Ty::sort("Res")],
             PatTm::tensor([
                 a_free.subst(&mut vec![(
                     name("iota_Res"),
@@ -673,16 +661,16 @@ mod tests {
             #/ agents:
             [m] : [ReMonomer] ⊢ M [m]
             #/ rules:
-            [r] : [Res] ⊢
-              bondAB [r]
+            [b, r] : [ReB, Res] ⊢
+              bondAB [b, r]
                 : (
                   (M iota_A, M iota_SiteB empty [], M iota_Res r []),
-                  (M iota_B, M iota_SiteA empty [])
+                  (M iota_B b [], M iota_SiteA empty [])
                 )
                 → let [s1, s2] = bond [] in
                   (
                     (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
-                    (M iota_B, M iota_SiteA s1 [])
+                    (M iota_B b [], M iota_SiteA s1 [])
                   )
             [s] : [SiteB] ⊢
               phosphorylate [s]
