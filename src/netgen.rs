@@ -438,7 +438,933 @@ mod tests {
 
         let species = expect![[r#"
             B [noSite []]
-            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]];
+            let (s#1, ##siteb#1) = bond [] in (A [s#1], B [hasSite [##siteb#1]])"#]]; // Note that `A` is unrestrictable.
         species.assert_eq(&NetGenerator::new(&model).species(2).join("\n"));
+    }
+
+    #[test]
+    fn toy_model_species_granularity_1() {
+        let model = model::toy_model_species_granularity_1();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            M [iota_A [ground_A []]]
+            M [iota_B [ground_B []]]
+            M [iota_K [ground_K []]]
+            M [iota_SiteA [emptyA []]]
+            M [iota_SiteB [emptyB []]]
+            M [iota_Res [phos []]]
+            M [iota_Res [unphos []]]
+            let (##sitea#1, ##siteb#1) = bond [] in
+              (M [iota_SiteA [##sitea#1]], M [iota_SiteB [##siteb#1]])
+            let (##siteb#1, ##sitea#1) = bond [] in
+              (M [iota_SiteB [##siteb#1]], M [iota_SiteA [##sitea#1]])"#]];
+        species.assert_eq(&generator.species(2).join("\n"));
+
+        let transitions = expect![[r#"
+            bondAB [ground_B [], phos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [ground_B [], unphos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            phosphorylate [emptyB []]
+              : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+              → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+            let (s, ##sitea#1) = bond [] in (M [iota_SiteA [##sitea#1]], phosphorylate [s])
+              : let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                )
+              → let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+                )"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
+    }
+
+    #[test]
+    fn toy_model_species_granularity_2() {
+        let model = model::toy_model_species_granularity_2();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            M [iota_A [ground_A []]]
+            M [iota_B [iota_B1 [ground_B1 []]]]
+            M [iota_B [iota_B2 [ground_B2 []]]]
+            M [iota_K [ground_K []]]
+            M [iota_SiteA [emptyA []]]
+            M [iota_SiteB [emptyB []]]
+            M [iota_Res [phos []]]
+            M [iota_Res [unphos []]]
+            let (##sitea#1, ##siteb#1) = bond [] in
+              (M [iota_SiteA [##sitea#1]], M [iota_SiteB [##siteb#1]])
+            let (##siteb#1, ##sitea#1) = bond [] in
+              (M [iota_SiteB [##siteb#1]], M [iota_SiteA [##sitea#1]])"#]];
+        species.assert_eq(&generator.species(2).join("\n"));
+
+        let transitions = expect![[r#"
+            bondAB [iota_B1 [ground_B1 []], phos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B1 [ground_B1 []], unphos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B2 [ground_B2 []], phos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            bondAB [iota_B2 [ground_B2 []], unphos []]
+              : (
+                (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                (M iota_B b [], M iota_SiteA empty [])
+              )
+              → let [s1, s2] = bond [] in
+                (
+                  (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA s1 [])
+                )
+            phosphorylate [emptyB []]
+              : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+              → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+            let (s, ##sitea#1) = bond [] in (M [iota_SiteA [##sitea#1]], phosphorylate [s])
+              : let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                )
+              → let (s, ##sitea#1) = bond [] in
+                (
+                  M [iota_SiteA [##sitea#1]],
+                  ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+                )"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n"));
+    }
+
+    #[test]
+    fn toy_model_emergent_agent() {
+        let model = model::toy_model_emergent_agent();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            A [e_B [], e_C []]
+            B [e_A [], e_C []]
+            C [e_AB [], e_AB []]
+            let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, e_C []])
+            let (ac, cb) = bond_C [] in (A [e_B [], ac], C [e_AB [], cb])
+            let (ac, ca) = bond_C [] in (A [e_B [], ac], C [ca, e_AB []])
+            let (bc, cb) = bond_C [] in (B [e_A [], bc], C [e_AB [], cb])
+            let (bc, ca) = bond_C [] in (B [e_A [], bc], C [ca, e_AB []])
+            let (ac#2, cb) = bond_C [] in
+              let (ac#1, ca) = bond_C [] in (A [e_B [], ac#1], A [e_B [], ac#2], C [ca, cb])
+            let (ac#1, cb) = bond_C [] in
+              let (ac#2, ca) = bond_C [] in (A [e_B [], ac#1], A [e_B [], ac#2], C [ca, cb])
+            let (bc, cb) = bond_C [] in
+              let (ac, ca) = bond_C [] in (A [e_B [], ac], B [e_A [], bc], C [ca, cb])
+            let (ac, cb) = bond_C [] in
+              let (bc, ca) = bond_C [] in (A [e_B [], ac], B [e_A [], bc], C [ca, cb])
+            let (bc, cb) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, bc], C [e_AB [], cb])
+            let (bc, ca) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, e_C []], B [ba, bc], C [ca, e_AB []])
+            let (ac, cb) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, e_C []], C [e_AB [], cb])
+            let (ac, ca) = bond_C [] in
+              let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, e_C []], C [ca, e_AB []])
+            let (bc, cb) = bond_C [] in
+              let (ac, ca) = bond_C [] in
+                let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, bc], C [ca, cb])
+            let (ac, cb) = bond_C [] in
+              let (bc, ca) = bond_C [] in
+                let (ab, ba) = bond_AB [] in (A [ab, ac], B [ba, bc], C [ca, cb])
+            let (bc#2, cb) = bond_C [] in
+              let (bc#1, ca) = bond_C [] in (B [e_A [], bc#1], B [e_A [], bc#2], C [ca, cb])
+            let (bc#1, cb) = bond_C [] in
+              let (bc#2, ca) = bond_C [] in (B [e_A [], bc#1], B [e_A [], bc#2], C [ca, cb])"#]];
+        species.assert_eq(&generator.species(3).join("\n"));
+
+        let transitions = expect![[r#"
+            R_dimerization [e_C [], e_C []]
+              : (A [e_B], B [e_A])
+              → let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C])
+            R_trimerization []
+              : (let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]), C [e_AB, e_AB])
+              → let [bc, cb] = bond [] in
+                let [ac, ca] = bond [] in
+                  (let [ab, ba] = bond [] in (A [ab, c], B [ba, c]), C [ca, cb])
+            let (cb#1, cb#2) = bond_C [] in
+                (C [e_AB [], cb#1], R_dimerization [e_C [], cb#2])
+              : let (cb#1, cb#2) = bond_C [] in (C [e_AB [], cb#1], (A [e_B], B [e_A]))
+              → let (cb#1, cb#2) = bond_C [] in
+                (C [e_AB [], cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (cb#1, ca#2) = bond_C [] in
+                (C [e_AB [], cb#1], R_dimerization [ca#2, e_C []])
+              : let (cb#1, ca#2) = bond_C [] in (C [e_AB [], cb#1], (A [e_B], B [e_A]))
+              → let (cb#1, ca#2) = bond_C [] in
+                (C [e_AB [], cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (ca#1, cb#2) = bond_C [] in
+                (C [ca#1, e_AB []], R_dimerization [e_C [], cb#2])
+              : let (ca#1, cb#2) = bond_C [] in (C [ca#1, e_AB []], (A [e_B], B [e_A]))
+              → let (ca#1, cb#2) = bond_C [] in
+                (C [ca#1, e_AB []], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (ca#1, ca#2) = bond_C [] in
+                (C [ca#1, e_AB []], R_dimerization [ca#2, e_C []])
+              : let (ca#1, ca#2) = bond_C [] in (C [ca#1, e_AB []], (A [e_B], B [e_A]))
+              → let (ca#1, ca#2) = bond_C [] in
+                (C [ca#1, e_AB []], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (cb#1, cb#2) = bond_C [] in
+                let (ca#1, ca#2) = bond_C [] in
+                  (C [ca#1, cb#1], R_dimerization [ca#2, cb#2])
+              : let (cb#1, cb#2) = bond_C [] in
+                let (ca#1, ca#2) = bond_C [] in (C [ca#1, cb#1], (A [e_B], B [e_A]))
+              → let (cb#1, cb#2) = bond_C [] in
+                let (ca#1, ca#2) = bond_C [] in
+                  (C [ca#1, cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))
+            let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in
+                  (C [ca#1, cb#1], R_dimerization [ca#2, cb#2])
+              : let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in (C [ca#1, cb#1], (A [e_B], B [e_A]))
+              → let (ca#1, cb#2) = bond_C [] in
+                let (cb#1, ca#2) = bond_C [] in
+                  (C [ca#1, cb#1], let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]))"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
+    }
+
+    #[test]
+    fn toy_model_directionality() {
+        let model = model::toy_model_directionality();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            A [e_h [], e_C [], e_t []]
+            let (ah, at) = bond_AB [] in A [ah, e_C [], at]
+            B [e_h [], e_C [], e_t []]
+            let (bh, bt) = bond_AB [] in B [bh, e_C [], bt]
+            C [e_ABh [], e_ABt []]
+            let (at#1, ah#2) = bond_AB [] in
+              (A [e_h [], e_C [], at#1], A [ah#2, e_C [], e_t []])
+            let (ah#1, at#2) = bond_AB [] in
+              (A [ah#1, e_C [], e_t []], A [e_h [], e_C [], at#2])
+            let (ah#1, at#2) = bond_AB [] in
+              let (at#1, ah#2) = bond_AB [] in
+                (A [ah#1, e_C [], at#1], A [ah#2, e_C [], at#2])
+            let (at, bh) = bond_AB [] in (A [e_h [], e_C [], at], B [bh, e_C [], e_t []])
+            let (ah, bt) = bond_AB [] in (A [ah, e_C [], e_t []], B [e_h [], e_C [], bt])
+            let (ah, bt) = bond_AB [] in
+              let (at, bh) = bond_AB [] in (A [ah, e_C [], at], B [bh, e_C [], bt])
+            let (ac, ct) = bond_Ct [] in (A [e_h [], ac, e_t []], C [e_ABh [], ct])
+            let (ac, ch) = bond_Ch [] in (A [e_h [], ac, e_t []], C [ch, e_ABt []])
+            let (ac, ct) = bond_Ct [] in
+              let (ah, at) = bond_AB [] in (A [ah, ac, at], C [e_ABh [], ct])
+            let (ac, ch) = bond_Ch [] in
+              let (ah, at) = bond_AB [] in (A [ah, ac, at], C [ch, e_ABt []])
+            let (bt#1, bh#2) = bond_AB [] in
+              (B [e_h [], e_C [], bt#1], B [bh#2, e_C [], e_t []])
+            let (bh#1, bt#2) = bond_AB [] in
+              (B [bh#1, e_C [], e_t []], B [e_h [], e_C [], bt#2])
+            let (bh#1, bt#2) = bond_AB [] in
+              let (bt#1, bh#2) = bond_AB [] in
+                (B [bh#1, e_C [], bt#1], B [bh#2, e_C [], bt#2])
+            let (bc, ct) = bond_Ct [] in (B [e_h [], bc, e_t []], C [e_ABh [], ct])
+            let (bc, ch) = bond_Ch [] in (B [e_h [], bc, e_t []], C [ch, e_ABt []])
+            let (bc, ct) = bond_Ct [] in
+              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [e_ABh [], ct])
+            let (bc, ch) = bond_Ch [] in
+              let (bh, bt) = bond_AB [] in (B [bh, bc, bt], C [ch, e_ABt []])"#]];
+        species.assert_eq(&generator.species(2).join("\n")); // Note that this model allows infinite polymerization
+
+        let transitions = expect![[r#"
+            R_AtoB_dimerization [e_h [], e_C [], e_C [], e_t []]
+              : (A [e_h [], e_C [], e_t], B [e_h, e_C [], e_t []])
+              → let [s1, s2] = bond_AB [] in
+                (A [e_h [], e_C [], s1], B [s2, e_C [], e_t []])
+            let (id_head, id_tail) = bond_AB [] in
+                R_AtoB_dimerization [id_head, e_C [], e_C [], id_tail]
+              : let (id_head, id_tail) = bond_AB [] in
+                (A [id_head, e_C [], e_t], B [e_h, e_C [], id_tail])
+              → let (id_head, id_tail) = bond_AB [] in
+                let [s1, s2] = bond_AB [] in
+                  (A [id_head, e_C [], s1], B [s2, e_C [], id_tail])
+            R_trimerization [e_h [], e_t []]
+              : (
+                let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, e_t []]),
+                C [e_Ch, e_Ct]
+              )
+              → let [ac, ca] = bond_Ch [] in
+                let [bc, cb] = bond_Ct [] in
+                  let [ab, ba] = bond_AB [] in
+                    (A [e_h [], ac, ab], B [ba, bc, e_t []], C [ca, cb])
+            let (id_head, id_tail) = bond_AB [] in R_trimerization [id_head, id_tail]
+              : let (id_head, id_tail) = bond_AB [] in
+                (
+                  let [s1, s2] = bond [] in (A [id_head, e_C, s1], B [s2, e_C, id_tail]),
+                  C [e_Ch, e_Ct]
+                )
+              → let (id_head, id_tail) = bond_AB [] in
+                let [ac, ca] = bond_Ch [] in
+                  let [bc, cb] = bond_Ct [] in
+                    let [ab, ba] = bond_AB [] in
+                      (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
+            let (at, id_head) = bond_AB [] in
+                (
+                  A [e_h [], e_C [], at],
+                  R_AtoB_dimerization [id_head, e_C [], e_C [], e_t []]
+                )
+              : let (at, id_head) = bond_AB [] in
+                (
+                  A [e_h [], e_C [], at],
+                  (A [id_head, e_C [], e_t], B [e_h, e_C [], e_t []])
+                )
+              → let (at, id_head) = bond_AB [] in
+                (
+                  A [e_h [], e_C [], at],
+                  let [s1, s2] = bond_AB [] in
+                    (A [id_head, e_C [], s1], B [s2, e_C [], e_t []])
+                )
+            let (ah, id_tail) = bond_AB [] in
+                (
+                  A [ah, e_C [], e_t []],
+                  R_AtoB_dimerization [e_h [], e_C [], e_C [], id_tail]
+                )
+              : let (ah, id_tail) = bond_AB [] in
+                (
+                  A [ah, e_C [], e_t []],
+                  (A [e_h [], e_C [], e_t], B [e_h, e_C [], id_tail])
+                )
+              → let (ah, id_tail) = bond_AB [] in
+                (
+                  A [ah, e_C [], e_t []],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail])
+                )
+            let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (
+                    A [ah, e_C [], at],
+                    R_AtoB_dimerization [id_head, e_C [], e_C [], id_tail]
+                  )
+              : let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (A [ah, e_C [], at], (A [id_head, e_C [], e_t], B [e_h, e_C [], id_tail]))
+              → let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (
+                    A [ah, e_C [], at],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, e_C [], s1], B [s2, e_C [], id_tail])
+                  )
+            let (at, id_head) = bond_AB [] in
+                (A [e_h [], e_C [], at], R_trimerization [id_head, e_t []])
+              : let (at, id_head) = bond_AB [] in
+                (
+                  A [e_h [], e_C [], at],
+                  (
+                    let [s1, s2] = bond [] in (A [id_head, e_C, s1], B [s2, e_C, e_t []]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (at, id_head) = bond_AB [] in
+                (
+                  A [e_h [], e_C [], at],
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [id_head, ac, ab], B [ba, bc, e_t []], C [ca, cb])
+                )
+            let (ah, id_tail) = bond_AB [] in
+                (A [ah, e_C [], e_t []], R_trimerization [e_h [], id_tail])
+              : let (ah, id_tail) = bond_AB [] in
+                (
+                  A [ah, e_C [], e_t []],
+                  (
+                    let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, id_tail]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (ah, id_tail) = bond_AB [] in
+                (
+                  A [ah, e_C [], e_t []],
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [e_h [], ac, ab], B [ba, bc, id_tail], C [ca, cb])
+                )
+            let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (A [ah, e_C [], at], R_trimerization [id_head, id_tail])
+              : let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (
+                    A [ah, e_C [], at],
+                    (
+                      let [s1, s2] = bond [] in
+                        (A [id_head, e_C, s1], B [s2, e_C, id_tail]),
+                      C [e_Ch, e_Ct]
+                    )
+                  )
+              → let (ah, id_tail) = bond_AB [] in
+                let (at, id_head) = bond_AB [] in
+                  (
+                    A [ah, e_C [], at],
+                    let [ac, ca] = bond_Ch [] in
+                      let [bc, cb] = bond_Ct [] in
+                        let [ab, ba] = bond_AB [] in
+                          (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
+                  )
+            let (bt, id_head) = bond_AB [] in
+                (
+                  B [e_h [], e_C [], bt],
+                  R_AtoB_dimerization [id_head, e_C [], e_C [], e_t []]
+                )
+              : let (bt, id_head) = bond_AB [] in
+                (
+                  B [e_h [], e_C [], bt],
+                  (A [id_head, e_C [], e_t], B [e_h, e_C [], e_t []])
+                )
+              → let (bt, id_head) = bond_AB [] in
+                (
+                  B [e_h [], e_C [], bt],
+                  let [s1, s2] = bond_AB [] in
+                    (A [id_head, e_C [], s1], B [s2, e_C [], e_t []])
+                )
+            let (bh, id_tail) = bond_AB [] in
+                (
+                  B [bh, e_C [], e_t []],
+                  R_AtoB_dimerization [e_h [], e_C [], e_C [], id_tail]
+                )
+              : let (bh, id_tail) = bond_AB [] in
+                (
+                  B [bh, e_C [], e_t []],
+                  (A [e_h [], e_C [], e_t], B [e_h, e_C [], id_tail])
+                )
+              → let (bh, id_tail) = bond_AB [] in
+                (
+                  B [bh, e_C [], e_t []],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail])
+                )
+            let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (
+                    B [bh, e_C [], bt],
+                    R_AtoB_dimerization [id_head, e_C [], e_C [], id_tail]
+                  )
+              : let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (B [bh, e_C [], bt], (A [id_head, e_C [], e_t], B [e_h, e_C [], id_tail]))
+              → let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (
+                    B [bh, e_C [], bt],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, e_C [], s1], B [s2, e_C [], id_tail])
+                  )
+            let (bt, id_head) = bond_AB [] in
+                (B [e_h [], e_C [], bt], R_trimerization [id_head, e_t []])
+              : let (bt, id_head) = bond_AB [] in
+                (
+                  B [e_h [], e_C [], bt],
+                  (
+                    let [s1, s2] = bond [] in (A [id_head, e_C, s1], B [s2, e_C, e_t []]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (bt, id_head) = bond_AB [] in
+                (
+                  B [e_h [], e_C [], bt],
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [id_head, ac, ab], B [ba, bc, e_t []], C [ca, cb])
+                )
+            let (bh, id_tail) = bond_AB [] in
+                (B [bh, e_C [], e_t []], R_trimerization [e_h [], id_tail])
+              : let (bh, id_tail) = bond_AB [] in
+                (
+                  B [bh, e_C [], e_t []],
+                  (
+                    let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, id_tail]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (bh, id_tail) = bond_AB [] in
+                (
+                  B [bh, e_C [], e_t []],
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [e_h [], ac, ab], B [ba, bc, id_tail], C [ca, cb])
+                )
+            let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (B [bh, e_C [], bt], R_trimerization [id_head, id_tail])
+              : let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (
+                    B [bh, e_C [], bt],
+                    (
+                      let [s1, s2] = bond [] in
+                        (A [id_head, e_C, s1], B [s2, e_C, id_tail]),
+                      C [e_Ch, e_Ct]
+                    )
+                  )
+              → let (bh, id_tail) = bond_AB [] in
+                let (bt, id_head) = bond_AB [] in
+                  (
+                    B [bh, e_C [], bt],
+                    let [ac, ca] = bond_Ch [] in
+                      let [bc, cb] = bond_Ct [] in
+                        let [ab, ba] = bond_AB [] in
+                          (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
+                  )
+            let (ct, id_Site_C2) = bond_Ct [] in
+                (C [e_ABh [], ct], R_AtoB_dimerization [e_h [], e_C [], id_Site_C2, e_t []])
+              : let (ct, id_Site_C2) = bond_Ct [] in
+                (C [e_ABh [], ct], (A [e_h [], e_C [], e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ct, id_Site_C2) = bond_Ct [] in
+                (
+                  C [e_ABh [], ct],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, id_Site_C2, e_t []])
+                )
+            let (ct, id_Site_C1) = bond_Ct [] in
+                (C [e_ABh [], ct], R_AtoB_dimerization [e_h [], id_Site_C1, e_C [], e_t []])
+              : let (ct, id_Site_C1) = bond_Ct [] in
+                (C [e_ABh [], ct], (A [e_h [], id_Site_C1, e_t], B [e_h, e_C [], e_t []]))
+              → let (ct, id_Site_C1) = bond_Ct [] in
+                (
+                  C [e_ABh [], ct],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], id_Site_C1, s1], B [s2, e_C [], e_t []])
+                )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    R_AtoB_dimerization [id_head, e_C [], id_Site_C2, id_tail]
+                  )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    (A [id_head, e_C [], e_t], B [e_h, id_Site_C2, id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, e_C [], s1], B [s2, id_Site_C2, id_tail])
+                  )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    R_AtoB_dimerization [id_head, id_Site_C1, e_C [], id_tail]
+                  )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    (A [id_head, id_Site_C1, e_t], B [e_h, e_C [], id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [e_ABh [], ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, id_Site_C1, s1], B [s2, e_C [], id_tail])
+                  )
+            let (ch, id_Site_C2) = bond_Ch [] in
+                (C [ch, e_ABt []], R_AtoB_dimerization [e_h [], e_C [], id_Site_C2, e_t []])
+              : let (ch, id_Site_C2) = bond_Ch [] in
+                (C [ch, e_ABt []], (A [e_h [], e_C [], e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ch, id_Site_C2) = bond_Ch [] in
+                (
+                  C [ch, e_ABt []],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, id_Site_C2, e_t []])
+                )
+            let (ch, id_Site_C1) = bond_Ch [] in
+                (C [ch, e_ABt []], R_AtoB_dimerization [e_h [], id_Site_C1, e_C [], e_t []])
+              : let (ch, id_Site_C1) = bond_Ch [] in
+                (C [ch, e_ABt []], (A [e_h [], id_Site_C1, e_t], B [e_h, e_C [], e_t []]))
+              → let (ch, id_Site_C1) = bond_Ch [] in
+                (
+                  C [ch, e_ABt []],
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], id_Site_C1, s1], B [s2, e_C [], e_t []])
+                )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    R_AtoB_dimerization [id_head, e_C [], id_Site_C2, id_tail]
+                  )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    (A [id_head, e_C [], e_t], B [e_h, id_Site_C2, id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, e_C [], s1], B [s2, id_Site_C2, id_tail])
+                  )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    R_AtoB_dimerization [id_head, id_Site_C1, e_C [], id_tail]
+                  )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    (A [id_head, id_Site_C1, e_t], B [e_h, e_C [], id_tail])
+                  )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (
+                    C [ch, e_ABt []],
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head, id_Site_C1, s1], B [s2, e_C [], id_tail])
+                  )
+            let (ct, id_Site_C2) = bond_Ct [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (C [ch, ct], R_AtoB_dimerization [e_h [], id_Site_C1, id_Site_C2, e_t []])
+              : let (ct, id_Site_C2) = bond_Ct [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (C [ch, ct], (A [e_h [], id_Site_C1, e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ct, id_Site_C2) = bond_Ct [] in
+                let (ch, id_Site_C1) = bond_Ch [] in
+                  (
+                    C [ch, ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [e_h [], id_Site_C1, s1], B [s2, id_Site_C2, e_t []])
+                  )
+            let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (C [ch, ct], R_AtoB_dimerization [e_h [], id_Site_C1, id_Site_C2, e_t []])
+              : let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (C [ch, ct], (A [e_h [], id_Site_C1, e_t], B [e_h, id_Site_C2, e_t []]))
+              → let (ch, id_Site_C2) = bond_Ch [] in
+                let (ct, id_Site_C1) = bond_Ct [] in
+                  (
+                    C [ch, ct],
+                    let [s1, s2] = bond_AB [] in
+                      (A [e_h [], id_Site_C1, s1], B [s2, id_Site_C2, e_t []])
+                  )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  let (ch, id_Site_C1) = bond_Ch [] in
+                    (
+                      C [ch, ct],
+                      R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
+                    )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  let (ch, id_Site_C1) = bond_Ch [] in
+                    (
+                      C [ch, ct],
+                      (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
+                    )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ct, id_Site_C2) = bond_Ct [] in
+                  let (ch, id_Site_C1) = bond_Ch [] in
+                    (
+                      C [ch, ct],
+                      let [s1, s2] = bond_AB [] in
+                        (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
+                    )
+            let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
+                    (
+                      C [ch, ct],
+                      R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
+                    )
+              : let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
+                    (
+                      C [ch, ct],
+                      (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
+                    )
+              → let (id_head, id_tail) = bond_AB [] in
+                let (ch, id_Site_C2) = bond_Ch [] in
+                  let (ct, id_Site_C1) = bond_Ct [] in
+                    (
+                      C [ch, ct],
+                      let [s1, s2] = bond_AB [] in
+                        (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
+                    )
+            let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  R_AtoB_dimerization [e_h [], e_C [], e_C [], id_tail#1],
+                  R_AtoB_dimerization [id_head#2, e_C [], e_C [], e_t []]
+                )
+              : let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  (A [e_h [], e_C [], e_t], B [e_h, e_C [], id_tail#1]),
+                  (A [id_head#2, e_C [], e_t], B [e_h, e_C [], e_t []])
+                )
+              → let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail#1]),
+                  let [s1, s2] = bond_AB [] in
+                    (A [id_head#2, e_C [], s1], B [s2, e_C [], e_t []])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  R_AtoB_dimerization [id_head#1, e_C [], e_C [], e_t []],
+                  R_AtoB_dimerization [e_h [], e_C [], e_C [], id_tail#2]
+                )
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  (A [id_head#1, e_C [], e_t], B [e_h, e_C [], e_t []]),
+                  (A [e_h [], e_C [], e_t], B [e_h, e_C [], id_tail#2])
+                )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  let [s1, s2] = bond_AB [] in
+                    (A [id_head#1, e_C [], s1], B [s2, e_C [], e_t []]),
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail#2])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    R_AtoB_dimerization [id_head#1, e_C [], e_C [], id_tail#1],
+                    R_AtoB_dimerization [id_head#2, e_C [], e_C [], id_tail#2]
+                  )
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    (A [id_head#1, e_C [], e_t], B [e_h, e_C [], id_tail#1]),
+                    (A [id_head#2, e_C [], e_t], B [e_h, e_C [], id_tail#2])
+                  )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head#1, e_C [], s1], B [s2, e_C [], id_tail#1]),
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head#2, e_C [], s1], B [s2, e_C [], id_tail#2])
+                  )
+            let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  R_AtoB_dimerization [e_h [], e_C [], e_C [], id_tail#1],
+                  R_trimerization [id_head#2, e_t []]
+                )
+              : let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  (A [e_h [], e_C [], e_t], B [e_h, e_C [], id_tail#1]),
+                  (
+                    let [s1, s2] = bond [] in (A [id_head#2, e_C, s1], B [s2, e_C, e_t []]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  let [s1, s2] = bond_AB [] in
+                    (A [e_h [], e_C [], s1], B [s2, e_C [], id_tail#1]),
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [id_head#2, ac, ab], B [ba, bc, e_t []], C [ca, cb])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  R_AtoB_dimerization [id_head#1, e_C [], e_C [], e_t []],
+                  R_trimerization [e_h [], id_tail#2]
+                )
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  (A [id_head#1, e_C [], e_t], B [e_h, e_C [], e_t []]),
+                  (
+                    let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, id_tail#2]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  let [s1, s2] = bond_AB [] in
+                    (A [id_head#1, e_C [], s1], B [s2, e_C [], e_t []]),
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [e_h [], ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    R_AtoB_dimerization [id_head#1, e_C [], e_C [], id_tail#1],
+                    R_trimerization [id_head#2, id_tail#2]
+                  )
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    (A [id_head#1, e_C [], e_t], B [e_h, e_C [], id_tail#1]),
+                    (
+                      let [s1, s2] = bond [] in
+                        (A [id_head#2, e_C, s1], B [s2, e_C, id_tail#2]),
+                      C [e_Ch, e_Ct]
+                    )
+                  )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    let [s1, s2] = bond_AB [] in
+                      (A [id_head#1, e_C [], s1], B [s2, e_C [], id_tail#1]),
+                    let [ac, ca] = bond_Ch [] in
+                      let [bc, cb] = bond_Ct [] in
+                        let [ab, ba] = bond_AB [] in
+                          (A [id_head#2, ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
+                  )
+            let (id_tail#1, id_head#2) = bond_AB [] in
+                (R_trimerization [e_h [], id_tail#1], R_trimerization [id_head#2, e_t []])
+              : let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  (
+                    let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, id_tail#1]),
+                    C [e_Ch, e_Ct]
+                  ),
+                  (
+                    let [s1, s2] = bond [] in (A [id_head#2, e_C, s1], B [s2, e_C, e_t []]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (id_tail#1, id_head#2) = bond_AB [] in
+                (
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [e_h [], ac, ab], B [ba, bc, id_tail#1], C [ca, cb]),
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [id_head#2, ac, ab], B [ba, bc, e_t []], C [ca, cb])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                (R_trimerization [id_head#1, e_t []], R_trimerization [e_h [], id_tail#2])
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  (
+                    let [s1, s2] = bond [] in (A [id_head#1, e_C, s1], B [s2, e_C, e_t []]),
+                    C [e_Ch, e_Ct]
+                  ),
+                  (
+                    let [s1, s2] = bond [] in (A [e_h [], e_C, s1], B [s2, e_C, id_tail#2]),
+                    C [e_Ch, e_Ct]
+                  )
+                )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                (
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [id_head#1, ac, ab], B [ba, bc, e_t []], C [ca, cb]),
+                  let [ac, ca] = bond_Ch [] in
+                    let [bc, cb] = bond_Ct [] in
+                      let [ab, ba] = bond_AB [] in
+                        (A [e_h [], ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
+                )
+            let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    R_trimerization [id_head#1, id_tail#1],
+                    R_trimerization [id_head#2, id_tail#2]
+                  )
+              : let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    (
+                      let [s1, s2] = bond [] in
+                        (A [id_head#1, e_C, s1], B [s2, e_C, id_tail#1]),
+                      C [e_Ch, e_Ct]
+                    ),
+                    (
+                      let [s1, s2] = bond [] in
+                        (A [id_head#2, e_C, s1], B [s2, e_C, id_tail#2]),
+                      C [e_Ch, e_Ct]
+                    )
+                  )
+              → let (id_head#1, id_tail#2) = bond_AB [] in
+                let (id_tail#1, id_head#2) = bond_AB [] in
+                  (
+                    let [ac, ca] = bond_Ch [] in
+                      let [bc, cb] = bond_Ct [] in
+                        let [ab, ba] = bond_AB [] in
+                          (A [id_head#1, ac, ab], B [ba, bc, id_tail#1], C [ca, cb]),
+                    let [ac, ca] = bond_Ch [] in
+                      let [bc, cb] = bond_Ct [] in
+                        let [ab, ba] = bond_AB [] in
+                          (A [id_head#2, ac, ab], B [ba, bc, id_tail#2], C [ca, cb])
+                  )"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
+    }
+
+    #[test]
+    fn toy_model_phospho_tyrosine() {
+        let model = model::toy_model_phospho_tyrosine();
+        let generator = NetGenerator::new(&model);
+
+        let species = expect![[r#"
+            A [e_sh2 []]
+            C [u [e_xtyr []]]
+            C [p [e_xtyr []]]
+            let (x, ##xtyr#1) = bond [] in (A [x], C [u [##xtyr#1]])
+            let (x, ##xtyr#1) = bond [] in (A [x], C [p [##xtyr#1]])"#]];
+        species.assert_eq(&generator.species(4).join("\n"));
+
+        let transitions = expect![[r#"
+            R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
+            R_dimerization []
+              : (A [e_sh2], C [p e_xtyr []])
+              → let [s1, s2] = bond [] in (A [s1], C [p [s2]])"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
     }
 }

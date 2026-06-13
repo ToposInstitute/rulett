@@ -213,18 +213,53 @@ impl fmt::Display for Model {
     }
 }
 
-/// A toy example of a ruled-based model (variant 1).
+/// A toy example of a rule-based model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_model_v1() -> Model {
     let decls = toy_model_decls("Site", "Site");
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
 
-/// A toy example of a ruled-based model (variant 2).
+/// A toy example of a rule-based model (variant 2).
 #[cfg(test)]
 pub(crate) fn toy_model_v2() -> Model {
     let decls = toy_model_decls("SiteA", "SiteB");
     Model::parse(toy_signature_v2(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (species granularity).
+#[cfg(test)]
+pub(crate) fn toy_model_species_granularity_1() -> Model {
+    let decls = model_decls_species_granularity();
+    Model::parse(toy_signature_species_granularity_1(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (species granularity).
+#[cfg(test)]
+pub(crate) fn toy_model_species_granularity_2() -> Model {
+    let decls = model_decls_species_granularity();
+    Model::parse(toy_signature_species_granularity_2(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (emergent agent (dimerization of A and B creates C-binding ability)).
+#[cfg(test)]
+pub(crate) fn toy_model_emergent_agent() -> Model {
+    let decls = model_decls_emergent_agent();
+    Model::parse(toy_signature_emergent_agent(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (emergent agent with directionality).
+#[cfg(test)]
+pub(crate) fn toy_model_directionality() -> Model {
+    let decls = model_decls_directionality();
+    Model::parse(toy_signature_directionality(), decls).unwrap()
+}
+
+/// A toy example of a rule-based model (phospho tyrosine).
+#[cfg(test)]
+pub(crate) fn toy_model_phospho_tyrosine() -> Model {
+    let decls = model_decls_phospho_tyrosine();
+    Model::parse(toy_signature_phospho_tyrosine(), decls).unwrap()
 }
 
 #[cfg(test)]
@@ -269,6 +304,276 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
         ),
     ]
 }
+
+#[cfg(test)]
+fn model_decls_species_granularity() -> [ModelDecl; 3] {
+    let re_a = PatTm::res("M", MorTm::var("iota_A"));
+    let re_b = PatTm::res("M", MorTm::var("iota_B"));
+    let re_k = PatTm::res("M", MorTm::var("iota_K"));
+
+    let site_a = PatTm::res("M", MorTm::var("iota_SiteA"));
+    let site_b = PatTm::res("M", MorTm::var("iota_SiteB"));
+    let res = PatTm::res("M", MorTm::var("iota_Res"));
+
+    let a: PatTm = PatTm::tensor([re_a, site_b, res]);
+    let b = PatTm::tensor([re_b, site_a]);
+    let b = b.subst(&mut vec![(name("iota_B"), MorTm::app("iota_B", MorTm::app("b", [])))]);
+    let k = PatTm::tensor([re_k]);
+
+    let a_phos =
+        a.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("phos", [])))]);
+    let a_unphos =
+        a.subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("unphos", [])))]);
+
+    let a_free = a.subst(&mut vec![(
+        name("iota_SiteB"),
+        MorTm::app("iota_SiteB", MorTm::app("empty", [])),
+    )]);
+    let b_free = b.subst(&mut vec![(
+        name("iota_SiteA"),
+        MorTm::app("iota_SiteA", MorTm::app("empty", [])),
+    )]);
+    let ab = PatTm::tensor([a, b]);
+    let ab_complex = ab.subst(&mut vec![
+        (name("iota_SiteA"), MorTm::app("iota_SiteA", MorTm::app("s1", []))),
+        (name("iota_SiteB"), MorTm::app("iota_SiteB", MorTm::app("s2", []))),
+    ]);
+    let ab_complex =
+        PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), ab_complex); // TODO: ask Evan how to do this
+    [
+        ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
+        ModelDecl::rule(
+            "bondAB",
+            [ObTm::var("b"), ObTm::var("r")],
+            [Ty::sort("ReB"), Ty::sort("Res")],
+            PatTm::tensor([
+                a_free.subst(&mut vec![(
+                    name("iota_Res"),
+                    MorTm::app("iota_Res", MorTm::app("r", [])),
+                )]), // @Evan: I believe the substitution here is required to introduce the variable "r"
+                b_free,
+            ]),
+            ab_complex
+                .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("r", [])))]),
+        ), // TODO: Enable formulation of rules that is agnostic of whether B has paralogs or not.
+        ModelDecl::rule(
+            "phosphorylate",
+            [ObTm::var("s")],
+            [Ty::sort("SiteB")],
+            PatTm::tensor([
+                a_unphos.subst(&mut vec![(
+                    name("iota_SiteB"),
+                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                )]),
+                k.clone(),
+            ]), // @Evan: what do you think of the requirement to clone here?
+            PatTm::tensor([
+                a_phos.subst(&mut vec![(
+                    name("iota_SiteB"),
+                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                )]),
+                k,
+            ]),
+        ),
+    ]
+}
+
+#[cfg(test)]
+fn model_decls_emergent_agent() -> [ModelDecl; 5] {
+    let ab = PatTm::let_(
+        [ObTm::var("ab"), ObTm::var("ba")],
+        MorTm::app("bond", []),
+        PatTm::tensor([
+            PatTm::res("A", [MorTm::var("ab"), MorTm::var("c")]),
+            PatTm::res("B", [MorTm::var("ba"), MorTm::var("c")]),
+        ]),
+    );
+    let abc_incomplete = PatTm::let_(
+        [ObTm::var("ac"), ObTm::var("ca")],
+        MorTm::app("bond", []),
+        PatTm::tensor([ab, PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")])]),
+    );
+    let abc =
+        PatTm::let_([ObTm::var("bc"), ObTm::var("cb")], MorTm::app("bond", []), abc_incomplete);
+    [
+        ModelDecl::agent(
+            "A",
+            [ObTm::var("ab"), ObTm::var("ac")],
+            [Ty::sort("SiteB"), Ty::sort("SiteC")],
+        ),
+        ModelDecl::agent(
+            "B",
+            [ObTm::var("ba"), ObTm::var("bc")],
+            [Ty::sort("SiteA"), Ty::sort("SiteC")],
+        ),
+        ModelDecl::agent(
+            "C",
+            [ObTm::var("ca"), ObTm::var("cb")],
+            [Ty::sort("SiteAB"), Ty::sort("SiteAB")],
+        ),
+        ModelDecl::rule(
+            "R_dimerization",
+            [ObTm::var("ca"), ObTm::var("cb")],
+            [Ty::sort("SiteC"), Ty::sort("SiteC")],
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("e_B")]),
+                PatTm::res("B", [MorTm::var("e_A")]),
+            ]),
+            PatTm::let_(
+                [ObTm::var("s1"), ObTm::var("s2")], // TODO: harmonize variable naming convention
+                MorTm::app("bond", []),
+                PatTm::tensor([
+                    PatTm::res("A", [MorTm::var("s1"), MorTm::var("e_C")]),
+                    PatTm::res("B", [MorTm::var("s2"), MorTm::var("e_C")]),
+                ]),
+            ),
+        ),
+        ModelDecl::rule(
+            "R_trimerization",
+            [],
+            [],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("s1"), ObTm::var("s2")],
+                    MorTm::app("bond", []),
+                    PatTm::tensor([
+                        PatTm::res("A", [MorTm::var("s1"), MorTm::var("e_C")]),
+                        PatTm::res("B", [MorTm::var("s2"), MorTm::var("e_C")]),
+                    ]),
+                ),
+                PatTm::res("C", [MorTm::var("e_AB"), MorTm::var("e_AB")]),
+            ]),
+            abc,
+        ),
+    ]
+}
+
+#[cfg(test)]
+fn model_decls_directionality() -> [ModelDecl; 5] {
+    let abc = PatTm::let_(
+        [ObTm::var("ac"), ObTm::var("ca")],
+        MorTm::app("bond_Ch", []),
+        PatTm::let_(
+            [ObTm::var("bc"), ObTm::var("cb")],
+            MorTm::app("bond_Ct", []),
+            PatTm::let_(
+                [ObTm::var("ab"), ObTm::var("ba")],
+                MorTm::app("bond_AB", []),
+                PatTm::tensor([
+                    PatTm::res("A", [MorTm::var("id_head"), MorTm::var("ac"), MorTm::var("ab")]),
+                    PatTm::res("B", [MorTm::var("ba"), MorTm::var("bc"), MorTm::var("id_tail")]),
+                    PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")]),
+                ]),
+            ),
+        ),
+    );
+    [
+        ModelDecl::agent(
+            "A",
+            [ObTm::var("ah"), ObTm::var("ac"), ObTm::var("at")],
+            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("tail")],
+        ),
+        ModelDecl::agent(
+            "B",
+            [ObTm::var("bh"), ObTm::var("bc"), ObTm::var("bt")],
+            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("tail")],
+        ),
+        ModelDecl::agent(
+            "C",
+            [ObTm::var("ch"), ObTm::var("ct")],
+            [Ty::sort("Site_ABh"), Ty::sort("Site_ABt")],
+        ),
+        ModelDecl::rule(
+            "R_AtoB_dimerization",
+            [
+                ObTm::var("id_head"),
+                ObTm::var("id_Site_C1"),
+                ObTm::var("id_Site_C2"),
+                ObTm::var("id_tail"),
+            ],
+            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("Site_C"), Ty::sort("tail")],
+            PatTm::tensor([
+                PatTm::res(
+                    "A",
+                    [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("e_t")],
+                ),
+                PatTm::res(
+                    "B",
+                    [MorTm::var("e_h"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
+                ),
+            ]),
+            PatTm::let_(
+                [ObTm::var("s1"), ObTm::var("s2")], // TODO: harmonize variable naming convention
+                MorTm::app("bond_AB", []),
+                PatTm::tensor([
+                    PatTm::res(
+                        "A",
+                        [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("s1")],
+                    ),
+                    PatTm::res(
+                        "B",
+                        [MorTm::var("s2"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
+                    ),
+                ]),
+            ),
+        ),
+        ModelDecl::rule(
+            "R_trimerization",
+            [ObTm::var("id_head"), ObTm::var("id_tail")],
+            [Ty::sort("head"), Ty::sort("tail")],
+            PatTm::tensor([
+                PatTm::let_(
+                    [ObTm::var("s1"), ObTm::var("s2")],
+                    MorTm::app("bond", []),
+                    PatTm::tensor([
+                        PatTm::res(
+                            "A",
+                            [MorTm::var("id_head"), MorTm::var("e_C"), MorTm::var("s1")],
+                        ),
+                        PatTm::res(
+                            "B",
+                            [MorTm::var("s2"), MorTm::var("e_C"), MorTm::var("id_tail")],
+                        ),
+                    ]),
+                ),
+                PatTm::res("C", [MorTm::var("e_Ch"), MorTm::var("e_Ct")]),
+            ]),
+            abc,
+        ),
+    ]
+} // This is not polymerization, cause there is no B to A dimerization.
+
+#[cfg(test)]
+fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
+    [
+        ModelDecl::agent("A", [ObTm::var("x")], [Ty::sort("SH2")]),
+        ModelDecl::agent("C", [ObTm::var("y")], [Ty::sort("Tyr")]),
+        ModelDecl::rule(
+            "R_phosphorylation",
+            [],
+            [],
+            PatTm::res("A", [MorTm::app("u", MorTm::app("e_xtyr", []))]),
+            PatTm::res("A", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+        ),
+        ModelDecl::rule(
+            "R_dimerization",
+            [],
+            [],
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("e_sh2")]),
+                PatTm::res("C", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+            ]),
+            PatTm::let_(
+                [ObTm::var("s1"), ObTm::var("s2")],
+                MorTm::app("bond", []),
+                PatTm::tensor([
+                    PatTm::res("A", [MorTm::var("s1")]),
+                    PatTm::res("C", [MorTm::app("p", [MorTm::var("s2")])]),
+                ]),
+            ),
+        ),
+    ]
+} // TODO: Implement this model as preorder (currently `u` and `p` are parallel morphisms); will require enableing LHS and RHS mismatches for phosphorylation rule
 
 #[cfg(test)]
 mod tests {
@@ -324,5 +629,197 @@ mod tests {
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
         expected.assert_eq(&toy_model_v2().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReB1
+            ReB2
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            ground_B : [] → ReB
+            #/ agents:
+            [m] : [ReMonomer] ⊢ M [m]
+            #/ rules:
+            [b, r] : [ReB, Res] ⊢
+              bondAB [b, r]
+                : (
+                  (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA empty [])
+                )
+                → let [s1, s2] = bond [] in
+                  (
+                    (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                    (M iota_B b [], M iota_SiteA s1 [])
+                  )
+            [s] : [SiteB] ⊢
+              phosphorylate [s]
+                : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+        "#]];
+        expected.assert_eq(&toy_model_species_granularity_1().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            ReMonomer
+            ReA
+            ReB
+            ReB1
+            ReB2
+            ReK
+            SiteA
+            SiteB
+            Res
+            #/ operations:
+            iota_A : [ReA] → ReMonomer
+            iota_B : [ReB] → ReMonomer
+            iota_B1 : [ReB1] → ReB
+            iota_B2 : [ReB2] → ReB
+            iota_K : [ReK] → ReMonomer
+            iota_SiteA : [SiteA] → ReMonomer
+            iota_SiteB : [SiteB] → ReMonomer
+            iota_Res : [Res] → ReMonomer
+            phos : [] → Res
+            unphos : [] → Res
+            ground_A : [] → ReA
+            ground_K : [] → ReK
+            emptyA : [] → SiteA
+            emptyB : [] → SiteB
+            bond : [] → ⊗ [SiteA, SiteB]
+            ground_B1 : [] → ReB1
+            ground_B2 : [] → ReB2
+            #/ agents:
+            [m] : [ReMonomer] ⊢ M [m]
+            #/ rules:
+            [b, r] : [ReB, Res] ⊢
+              bondAB [b, r]
+                : (
+                  (M iota_A, M iota_SiteB empty [], M iota_Res r []),
+                  (M iota_B b [], M iota_SiteA empty [])
+                )
+                → let [s1, s2] = bond [] in
+                  (
+                    (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
+                    (M iota_B b [], M iota_SiteA s1 [])
+                  )
+            [s] : [SiteB] ⊢
+              phosphorylate [s]
+                : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
+                → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+        "#]];
+        expected.assert_eq(&toy_model_species_granularity_2().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            SiteA
+            SiteB
+            SiteC
+            SiteAB
+            #/ operations:
+            e_A : [] → SiteA
+            e_B : [] → SiteB
+            e_C : [] → SiteC
+            e_AB : [] → SiteAB
+            bond_AB : [] → ⊗ [SiteA, SiteB]
+            bond_C : [] → ⊗ [SiteAB, SiteC]
+            #/ agents:
+            [ab, ac] : [SiteB, SiteC] ⊢ A [ab, ac]
+            [ba, bc] : [SiteA, SiteC] ⊢ B [ba, bc]
+            [ca, cb] : [SiteAB, SiteAB] ⊢ C [ca, cb]
+            #/ rules:
+            [ca, cb] : [SiteC, SiteC] ⊢
+              R_dimerization [ca, cb]
+                : (A [e_B], B [e_A])
+                → let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C])
+            [] : [] ⊢
+              R_trimerization []
+                : (let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]), C [e_AB, e_AB])
+                → let [bc, cb] = bond [] in
+                  let [ac, ca] = bond [] in
+                    (let [ab, ba] = bond [] in (A [ab, c], B [ba, c]), C [ca, cb])
+        "#]]; // TODO: fix unbound variables in nested let statement
+        expected.assert_eq(&toy_model_emergent_agent().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            head
+            tail
+            Site_C
+            Site_ABh
+            Site_ABt
+            #/ operations:
+            e_h : [] → head
+            e_t : [] → tail
+            e_C : [] → Site_C
+            e_ABh : [] → Site_ABh
+            e_ABt : [] → Site_ABt
+            bond_AB : [] → ⊗ [head, tail]
+            bond_Ch : [] → ⊗ [Site_ABh, Site_C]
+            bond_Ct : [] → ⊗ [Site_ABt, Site_C]
+            #/ agents:
+            [ah, ac, at] : [head, Site_C, tail] ⊢ A [ah, ac, at]
+            [bh, bc, bt] : [head, Site_C, tail] ⊢ B [bh, bc, bt]
+            [ch, ct] : [Site_ABh, Site_ABt] ⊢ C [ch, ct]
+            #/ rules:
+            [id_head, id_Site_C1, id_Site_C2, id_tail] : [head, Site_C, Site_C, tail] ⊢
+              R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
+                : (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
+                → let [s1, s2] = bond_AB [] in
+                  (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
+            [id_head, id_tail] : [head, tail] ⊢
+              R_trimerization [id_head, id_tail]
+                : (
+                  let [s1, s2] = bond [] in (A [id_head, e_C, s1], B [s2, e_C, id_tail]),
+                  C [e_Ch, e_Ct]
+                )
+                → let [ac, ca] = bond_Ch [] in
+                  let [bc, cb] = bond_Ct [] in
+                    let [ab, ba] = bond_AB [] in
+                      (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
+        "#]]; // TODO: fix unbound variables in nested let statement
+        expected.assert_eq(&toy_model_directionality().to_string());
+
+        let expected = expect![[r#"
+            #/ sorts:
+            Tyr
+            SH2
+            xTyr
+            #/ operations:
+            e_sh2 : [] → SH2
+            e_xtyr : [] → xTyr
+            u : [xTyr] → Tyr
+            p : [xTyr] → Tyr
+            bond : [] → ⊗ [SH2, xTyr]
+            #/ agents:
+            [x] : [SH2] ⊢ A [x]
+            [y] : [Tyr] ⊢ C [y]
+            #/ rules:
+            [] : [] ⊢ R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
+            [] : [] ⊢
+              R_dimerization []
+                : (A [e_sh2], C [p e_xtyr []])
+                → let [s1, s2] = bond [] in (A [s1], C [p [s2]])
+        "#]];
+        expected.assert_eq(&toy_model_phospho_tyrosine().to_string());
     }
 }
