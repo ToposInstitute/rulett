@@ -1,9 +1,11 @@
+pub mod core;
 pub mod model;
 pub mod name;
 pub mod net;
+pub mod ob_tm;
 pub mod netgen;
 pub mod prelude;
 pub(crate) mod pretty;
+pub mod surface;
 pub mod theory;
-pub mod tm;
 pub mod ty;

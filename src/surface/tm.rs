@@ -1,191 +1,9 @@
-//! Terms for rule-based models.
+//! Terms in surface syntax.
 
 use pretty::RcDoc;
 use std::fmt;
 
-use super::{prelude::*, ty::*};
-
-/// Object term.
-///
-/// More precisely, this is an object term sans type. The judgment that an
-/// object term has a type is represented by [`ObTmJudgment`].
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ObTm {
-    /// A variable.
-    ///
-    /// Example syntax: `x`
-    Var(Name),
-
-    /// A list of terms.
-    ///
-    /// Example syntax: `[x, y, z]`
-    List(Vec<ObTm>),
-
-    /// An application of the tensor product to a term.
-    ///
-    /// Example syntax: `⊗ [t, s]`
-    Tensor(Box<ObTm>),
-}
-
-impl fmt::Display for ObTm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        render_doc(self.to_doc(), f)
-    }
-}
-
-impl FromIterator<ObTm> for ObTm {
-    fn from_iter<T: IntoIterator<Item = ObTm>>(iter: T) -> Self {
-        Self::List(iter.into_iter().collect())
-    }
-}
-
-impl<const N: usize> From<[ObTm; N]> for ObTm {
-    fn from(value: [ObTm; N]) -> Self {
-        Self::List(value.into())
-    }
-}
-
-impl ObTm {
-    /// Pretty document for the object term.
-    pub fn to_doc(&self) -> RcDoc<'static> {
-        match self {
-            ObTm::Var(name) => RcDoc::text(name.as_str()),
-            ObTm::List(terms) => bracketed("[", "]", terms.iter().map(ObTm::to_doc)),
-            ObTm::Tensor(tm) => match &**tm {
-                ObTm::List(terms) => bracketed("(", ")", terms.iter().map(ObTm::to_doc)),
-                _ => RcDoc::text("⊗ ").append(tm.to_doc()),
-            },
-        }
-    }
-
-    /// Smart constructor for [`Var`](Self::Var) variant.
-    pub fn var(name: impl Into<Name>) -> Self {
-        Self::Var(name.into())
-    }
-
-    /// Smart constructor for [`List`](Self::List) variant.
-    pub fn list(terms: impl IntoIterator<Item = ObTm>) -> Self {
-        Self::from_iter(terms)
-    }
-
-    /// Smart constructor for [`Tensor`](Self::Tensor) variant.
-    pub fn tensor(tm: impl Into<ObTm>) -> Self {
-        Self::Tensor(Box::new(tm.into()))
-    }
-
-    /// Checks whether the term has the given type.
-    ///
-    /// Returns an error when the term is ill-formed or ill-typed.
-    pub fn check(&self, ty: &Ty) -> Result<(), String> {
-        self.vars()
-            .map_err(|name| format!("variable {name} used twice"))
-            .and_then(|_| self.check_types(ty))
-    }
-
-    fn check_types(&self, ty: &Ty) -> Result<(), String> {
-        match self {
-            ObTm::Var(name) => match ty {
-                Ty::Sort(_) => Ok(()),
-                _ => Err(format!("variable {name} should have primitive type, received: {ty}")),
-            },
-            ObTm::List(terms) => match ty {
-                Ty::List(types) => {
-                    if terms.len() != types.len() {
-                        return Err(format!(
-                            "list term and type have different lengths: {self} vs {ty}"
-                        ));
-                    }
-                    for (tm, ty) in terms.iter().zip(types) {
-                        tm.check(ty)?;
-                    }
-                    Ok(())
-                }
-                _ => Err(format!("list term should have list type: {self} vs {ty}")),
-            },
-            ObTm::Tensor(tm) => match ty {
-                Ty::Tensor(ty) => tm.check(ty),
-                _ => Err(format!("tensor term should have tensor type: {self} vs {ty}")),
-            },
-        }
-    }
-
-    /// Collects all the variables that appear in the term.
-    ///
-    /// In a valid object term, no variable is repeated. Returns an error
-    /// containing the offending name if a variable is encountered twice.
-    pub fn vars(&self) -> Result<IndexSet<Name>, Name> {
-        fn recurse(vars: &mut IndexSet<Name>, tm: &ObTm) -> Result<(), Name> {
-            match tm {
-                ObTm::Var(name) => {
-                    if !vars.insert(*name) {
-                        return Err(*name);
-                    }
-                }
-                ObTm::List(terms) => {
-                    for tm in terms {
-                        recurse(vars, tm)?;
-                    }
-                }
-                ObTm::Tensor(tm) => recurse(vars, tm)?,
-            }
-            Ok(())
-        }
-        let mut vars = IndexSet::new();
-        recurse(&mut vars, self)?;
-        Ok(vars)
-    }
-}
-
-/// Judgment that an object term has a type.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ObTmJudgment {
-    /// The underlying term.
-    pub tm: ObTm,
-    /// The underlying type.
-    pub ty: Ty,
-}
-
-impl ObTmJudgment {
-    /// Judges that the given term has the given type, or returns an error.
-    ///
-    /// While a raw constructor is allowed for efficiency in
-    /// correct-by-construction algorithms, this is the preferred way to
-    /// construct a judgment, as it guarantees that the judgment is valid.
-    pub fn judge(tm: ObTm, ty: Ty) -> Result<Self, String> {
-        tm.check(&ty)?;
-        Ok(Self { tm, ty })
-    }
-
-    /// Collects variable-sort pairs from the judgment.
-    ///
-    /// Never panics but the result is undefined if the judgment is invalid.
-    pub fn typed_vars(&self) -> IndexMap<Name, Name> {
-        fn recurse(vars: &mut IndexMap<Name, Name>, tm: &ObTm, ty: &Ty) {
-            match tm {
-                ObTm::Var(name) => {
-                    if let Ty::Sort(sort) = ty {
-                        vars.insert(*name, *sort);
-                    }
-                }
-                ObTm::List(terms) => {
-                    if let Ty::List(types) = ty {
-                        for (tm, ty) in terms.iter().zip(types) {
-                            recurse(vars, tm, ty);
-                        }
-                    }
-                }
-                ObTm::Tensor(tm) => {
-                    if let Ty::Tensor(ty) = ty {
-                        recurse(vars, tm, ty);
-                    }
-                }
-            }
-        }
-        let mut vars = IndexMap::new();
-        recurse(&mut vars, &self.tm, &self.ty);
-        vars
-    }
-}
+use crate::{core, ob_tm::*, prelude::*};
 
 /// Morphism term (sans domain term and codomain type).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -321,6 +139,29 @@ impl MorTm {
         }
     }
 
+    /// Elaborates the term from surface syntax into core syntax.
+    pub fn elab(&self) -> core::MorTm {
+        self.elab_with(&mut Vec::new())
+    }
+
+    fn elab_with<'a>(&'a self, env: &mut Vec<&'a ObTm>) -> core::MorTm {
+        match self {
+            MorTm::Var(name) => elab_var(*name, env),
+            MorTm::List(terms) => {
+                core::MorTm::List(terms.iter().map(|tm| tm.elab_with(env)).collect())
+            }
+            MorTm::Tensor(tm) => core::MorTm::Tensor(Box::new(tm.elab_with(env))),
+            MorTm::App(name, tm) => core::MorTm::App(*name, Box::new(tm.elab_with(env))),
+            MorTm::Let { bindings, bound, body } => {
+                let bound = Box::new(bound.elab_with(env));
+                env.push(bindings);
+                let body = Box::new(body.elab_with(env));
+                env.pop();
+                core::MorTm::Let { bound, body }
+            }
+        }
+    }
+
     /// Simultaneously substitutes terms for free variables in the term.
     ///
     /// Warning: substitution is not capture-avoiding.
@@ -362,7 +203,7 @@ pub enum PatTm {
     /// Example syntax: `A t` or `R t`, where `t = [x, y]`
     Res(Name, MorTm),
 
-    /// A list of patterns.
+    /// A list of terms.
     ///
     /// Example syntax: `[A [x], R [y]]`
     List(Vec<PatTm>),
@@ -498,6 +339,28 @@ impl PatTm {
         } else {
             // Otherwise, introduce a let binding.
             Self::let_(at, along, self.clone())
+        }
+    }
+
+    /// Elaborates the pattern term from surface syntax into core syntax.
+    pub fn elab(&self) -> core::PatTm {
+        self.elab_with(&mut Vec::new())
+    }
+
+    fn elab_with<'a>(&'a self, env: &mut Vec<&'a ObTm>) -> core::PatTm {
+        match self {
+            PatTm::Res(name, tm) => core::PatTm::Res(*name, tm.elab_with(env)),
+            PatTm::List(patterns) => {
+                core::PatTm::List(patterns.iter().map(|p| p.elab_with(env)).collect())
+            }
+            PatTm::Tensor(tm) => core::PatTm::Tensor(Box::new(tm.elab_with(env))),
+            PatTm::Let { bindings, bound, body } => {
+                let bound = bound.elab_with(env);
+                env.push(bindings);
+                let body = Box::new(body.elab_with(env));
+                env.pop();
+                core::PatTm::Let { bound, body }
+            }
         }
     }
 
@@ -647,37 +510,63 @@ impl RuleTm {
     }
 }
 
+/// Elaborates a surface variable into a free or bound core variable.
+///
+/// The binder stack `env` holds the binding structures of the enclosing let
+/// bindings, innermost last. It is searched from innermost to outermost; the de
+/// Bruijn index of a [`BVar`](core::MorTm::BVar) is the number of let bindings
+/// between the use of the variable and the binding that introduces it.
+fn elab_var(name: Name, env: &[&ObTm]) -> core::MorTm {
+    for (index, bindings) in env.iter().rev().enumerate() {
+        if let Some(mut path) = bvar_path(bindings, name) {
+            // `bvar_path` builds the path innermost first; reverse it so the
+            // segments are ordered outermost first, as [`BVarSegment`] expects.
+            path.reverse();
+            return core::MorTm::BVar(index, path);
+        }
+    }
+    core::MorTm::FVar(name)
+}
+
+/// Computes the path from a let binding's structure to a bound variable.
+///
+/// Returns `None` if the variable does not occur in the binding structure. The
+/// returned segments are ordered innermost first (the reverse of what
+/// [`BVarSegment`] expects), since each level pushes its own segment as the
+/// recursion unwinds; the caller reverses them.
+///
+/// [`BVarSegment`]: core::BVarSegment
+fn bvar_path(bindings: &ObTm, name: Name) -> Option<Vec<core::BVarSegment>> {
+    match bindings {
+        ObTm::Var(n) => (*n == name).then(Vec::new),
+        ObTm::List(terms) => terms.iter().enumerate().find_map(|(i, tm)| {
+            bvar_path(tm, name).map(|mut path| {
+                path.push(core::BVarSegment::List(i));
+                path
+            })
+        }),
+        ObTm::Tensor(tm) => bvar_path(tm, name).map(|mut path| {
+            path.push(core::BVarSegment::Tensor);
+            path
+        }),
+    }
+}
+
+/// Pretty document for `let <bindings> = <bound> in <body>`, breakable after `in`.
+fn let_doc<'a>(bindings: RcDoc<'a>, bound: RcDoc<'a>, body: RcDoc<'a>) -> RcDoc<'a> {
+    RcDoc::text("let ")
+        .append(bindings)
+        .append(RcDoc::text(" = "))
+        .append(bound)
+        .append(RcDoc::text(" in"))
+        .append(RcDoc::line().append(body).nest(2))
+        .group()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use expect_test::expect;
-
-    #[test]
-    fn check_ob() {
-        // Variables.
-        assert!(ObTm::var("x").check(&Ty::sort("X")).is_ok());
-        let err = expect!["variable x should have primitive type, received: [X]"];
-        err.assert_eq(&ObTm::var("x").check(&Ty::list([Ty::sort("X")])).unwrap_err());
-
-        // Lists.
-        let tm = ObTm::list([ObTm::var("x"), ObTm::var("y")]);
-        assert!(tm.check(&Ty::list([Ty::sort("X"), Ty::sort("Y")])).is_ok());
-        assert!(ObTm::list([]).check(&Ty::list([])).is_ok());
-        let err = expect!["list term and type have different lengths: [x, y] vs [X]"];
-        err.assert_eq(&tm.check(&Ty::list([Ty::sort("X")])).unwrap_err());
-        let err = expect!["list term should have list type: [x, y] vs X"];
-        err.assert_eq(&tm.check(&Ty::sort("X")).unwrap_err());
-        let tm = ObTm::list([ObTm::var("x"), ObTm::var("x")]);
-        let err = expect!["variable x used twice"];
-        err.assert_eq(&tm.check(&Ty::list([Ty::sort("X"), Ty::sort("X")])).unwrap_err());
-
-        // Tensors.
-        let tm = ObTm::tensor([ObTm::var("x"), ObTm::var("y")]);
-        let ty = Ty::tensor([Ty::sort("X"), Ty::sort("Y")]);
-        assert!(tm.check(&ty).is_ok());
-        let err = expect!["tensor term should have tensor type: (x, y) vs X"];
-        err.assert_eq(&tm.check(&Ty::sort("X")).unwrap_err());
-    }
 
     #[test]
     fn subst_mor() {
@@ -775,5 +664,58 @@ mod tests {
         ]));
         let expected = expect!["(let y = g [] in A [y], let x = f [] in B [x])"];
         expected.assert_eq(&tm.factorize().to_string());
+    }
+
+    #[test]
+    fn elab_mor() {
+        // Lone variables are free.
+        expect!["x"].assert_eq(&MorTm::var("x").elab().to_string());
+
+        // A single binding binds at index 0; other variables remain free.
+        let tm = MorTm::let_(
+            ObTm::var("x"),
+            MorTm::app("f", []),
+            [MorTm::var("x"), MorTm::var("y")],
+        );
+        expect!["let f [] in [0, y]"].assert_eq(&tm.elab().to_string());
+
+        // A list destructure indexes into the binding by position.
+        let tm = MorTm::let_(
+            [ObTm::var("x"), ObTm::var("y")],
+            MorTm::app("f", []),
+            [MorTm::var("y"), MorTm::var("x")],
+        );
+        expect!["let f [] in [0.1, 0.0]"].assert_eq(&tm.elab().to_string());
+
+        // Nested bindings: the de Bruijn index counts enclosing bindings and a
+        // tensor destructure descends through an (omitted) tensor segment.
+        let tm = MorTm::let_(
+            ObTm::var("x"),
+            MorTm::app("f", []),
+            MorTm::let_(
+                ObTm::tensor([ObTm::var("y"), ObTm::var("z")]),
+                MorTm::app("g", []),
+                [MorTm::var("x"), MorTm::var("y"), MorTm::var("z")],
+            ),
+        );
+        expect!["let f [] in let g [] in [1, 0.0, 0.1]"].assert_eq(&tm.elab().to_string());
+
+        // The innermost binding shadows outer ones.
+        let tm = MorTm::let_(
+            ObTm::var("x"),
+            MorTm::app("f", []),
+            MorTm::let_(ObTm::var("x"), MorTm::app("g", []), MorTm::var("x")),
+        );
+        expect!["let f [] in let g [] in 0"].assert_eq(&tm.elab().to_string());
+    }
+
+    #[test]
+    fn elab_pattern() {
+        let tm = PatTm::let_(
+            ObTm::tensor([ObTm::var("x"), ObTm::var("y")]),
+            MorTm::app("f", []),
+            PatTm::tensor([PatTm::res("A", [MorTm::var("x")]), PatTm::res("B", [MorTm::var("y")])]),
+        );
+        expect!["let f [] in (A [0.0], B [0.1])"].assert_eq(&tm.elab().to_string());
     }
 }

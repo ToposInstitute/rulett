@@ -4,7 +4,7 @@ use itertools::zip_eq;
 use pretty::RcDoc;
 use std::fmt;
 
-use super::{prelude::*, theory::*, tm::*, ty::*};
+use super::{ob_tm::*, prelude::*, surface::tm::*, theory::*, ty::*};
 
 /// Declaration in the definition of a rule-based model.
 pub enum ModelDecl {

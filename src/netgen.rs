@@ -4,7 +4,7 @@ use itertools::{chain, zip_eq};
 use std::rc::Rc;
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
-use super::{model::*, net::*, prelude::*, tm::*, ty::*};
+use super::{model::*, net::*, ob_tm::*, prelude::*, surface::tm::*, ty::*};
 
 /// Wrapper enum for the two kinds of terms in a model.
 ///

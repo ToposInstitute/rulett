@@ -46,14 +46,3 @@ pub fn mor_doc<'a>(mor: RcDoc<'a>, dom: RcDoc<'a>, cod: RcDoc<'a>) -> RcDoc<'a> 
         .nest(2)
         .group()
 }
-
-/// Pretty document for `let <bindings> = <bound> in <body>`, breakable after `in`.
-pub fn let_doc<'a>(bindings: RcDoc<'a>, bound: RcDoc<'a>, body: RcDoc<'a>) -> RcDoc<'a> {
-    RcDoc::text("let ")
-        .append(bindings)
-        .append(RcDoc::text(" = "))
-        .append(bound)
-        .append(RcDoc::text(" in"))
-        .append(RcDoc::line().append(body).nest(2))
-        .group()
-}
