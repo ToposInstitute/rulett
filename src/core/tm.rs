@@ -156,6 +156,37 @@ impl MorTm {
             }
         }
     }
+
+    /// Returns whether a bound variable at the given depth is used.
+    fn uses_bvar(&self, depth: usize) -> bool {
+        match self {
+            MorTm::FVar(_) => false,
+            MorTm::BVar(index, _) => *index == depth,
+            MorTm::List(terms) => terms.iter().any(|t| t.uses_bvar(depth)),
+            MorTm::Tensor(tm) => tm.uses_bvar(depth),
+            MorTm::App(_, tm) => tm.uses_bvar(depth),
+            MorTm::Let { bound, body } => bound.uses_bvar(depth) || body.uses_bvar(depth + 1),
+        }
+    }
+
+    /// Decrements the index of bound variables referring past the given depth.
+    fn shift_down(&mut self, depth: usize) {
+        match self {
+            MorTm::FVar(_) => {}
+            MorTm::BVar(index, _) => {
+                if *index > depth {
+                    *index -= 1;
+                }
+            }
+            MorTm::List(terms) => terms.iter_mut().for_each(|t| t.shift_down(depth)),
+            MorTm::Tensor(tm) => tm.shift_down(depth),
+            MorTm::App(_, tm) => tm.shift_down(depth),
+            MorTm::Let { bound, body } => {
+                bound.shift_down(depth);
+                body.shift_down(depth + 1);
+            }
+        }
+    }
 }
 
 /// Renders a bound variable as a string.
@@ -319,6 +350,86 @@ impl PatTm {
             }
         }
     }
+
+    /// Collect terms from a tensor product at the top level.
+    pub fn collect_tensor(self) -> Vec<Self> {
+        match self {
+            PatTm::Tensor(tm) => match *tm {
+                PatTm::List(terms) => terms,
+                _ => vec![PatTm::Tensor(tm)],
+            },
+            _ => vec![self],
+        }
+    }
+
+    /// Factorizes the pattern by pushing let bindings into (tensors of) lists.
+    ///
+    /// A let binding is pushed into a list when exactly one item uses the bound
+    /// variable. (Since the type theory is linear, in a valid term, this item
+    /// will then itself use the bound variable exactly once.)
+    pub fn factorize(self) -> Self {
+        match self {
+            PatTm::Res(..) => self,
+            PatTm::List(patterns) => PatTm::list(patterns.into_iter().map(Self::factorize)),
+            PatTm::Tensor(tm) => PatTm::tensor(tm.factorize()),
+            PatTm::Let { bound, body } => Self::factorize_let(bound, body.factorize()),
+        }
+    }
+
+    fn factorize_let(bound: MorTm, body: PatTm) -> PatTm {
+        match body {
+            PatTm::Tensor(inner) if matches!(&*inner, PatTm::List(_)) => {
+                PatTm::tensor(Self::factorize_let(bound, *inner))
+            }
+            PatTm::List(mut terms) => {
+                // Get the unique term, if any, using the let binding at this level.
+                let unique_user = terms
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, tm)| tm.uses_bvar(0).then_some(i))
+                    .exactly_one();
+
+                if let Ok(i) = unique_user {
+                    // The other terms lose this enclosing binder, so shift their
+                    // bound variables down to compensate.
+                    for (j, tm) in terms.iter_mut().enumerate() {
+                        if j != i {
+                            tm.shift_down(0);
+                        }
+                    }
+                    let tm = std::mem::replace(&mut terms[i], PatTm::List(vec![]));
+                    terms[i] = Self::factorize_let(bound, tm);
+                    PatTm::list(terms)
+                } else {
+                    PatTm::let_(bound, PatTm::list(terms))
+                }
+            }
+            other => PatTm::let_(bound, other),
+        }
+    }
+
+    /// Returns whether a bound variable at the given depth is used.
+    fn uses_bvar(&self, depth: usize) -> bool {
+        match self {
+            PatTm::Res(_, tm) => tm.uses_bvar(depth),
+            PatTm::List(patterns) => patterns.iter().any(|p| p.uses_bvar(depth)),
+            PatTm::Tensor(pattern) => pattern.uses_bvar(depth),
+            PatTm::Let { bound, body } => bound.uses_bvar(depth) || body.uses_bvar(depth + 1),
+        }
+    }
+
+    /// Decrements the index of bound variables referring past the given depth.
+    fn shift_down(&mut self, depth: usize) {
+        match self {
+            PatTm::Res(_, tm) => tm.shift_down(depth),
+            PatTm::List(patterns) => patterns.iter_mut().for_each(|p| p.shift_down(depth)),
+            PatTm::Tensor(pattern) => pattern.shift_down(depth),
+            PatTm::Let { bound, body } => {
+                bound.shift_down(depth);
+                body.shift_down(depth + 1);
+            }
+        }
+    }
 }
 
 /// Rule term.
@@ -459,5 +570,48 @@ mod tests {
         expect!["let g [] in A [x, 0]"].assert_eq(&tm.to_string());
         let bound = tm.bind(&ObTm::var("x"), MorTm::app("f", []));
         expect!["let f [] in let g [] in A [1, 0]"].assert_eq(&bound.to_string());
+    }
+
+    #[test]
+    fn collect_pattern() {
+        let a = PatTm::res("A", [MorTm::app("f", [])]);
+        let b = PatTm::res("B", [MorTm::app("g", [])]);
+        let ab = [a.clone(), b.clone()];
+        assert_eq!(PatTm::tensor(ab.clone()).collect_tensor(), ab);
+        assert_eq!(a.clone().collect_tensor(), vec![a]);
+    }
+
+    #[test]
+    fn factorize_pattern() {
+        let tm = PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("x"), MorTm::fvar("y")]),
+            PatTm::res("B", []),
+        ])
+        .bind(&ObTm::tensor([ObTm::var("x"), ObTm::var("y")]), MorTm::app("f", []));
+        expect!["(let f [] in A [0.0, 0.1], B [])"].assert_eq(&tm.factorize().to_string());
+
+        // Wraps a body in `let x = f [] in let y = g [] in ...`.
+        fn bind(body: PatTm) -> PatTm {
+            body.bind(&ObTm::var("y"), MorTm::app("g", []))
+                .bind(&ObTm::var("x"), MorTm::app("f", []))
+        }
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("x"), MorTm::fvar("y")]),
+            PatTm::res("B", []),
+        ]));
+        expect!["(let f [] in let g [] in A [1, 0], B [])"].assert_eq(&tm.factorize().to_string());
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("x")]),
+            PatTm::res("B", [MorTm::fvar("y")]),
+        ]));
+        expect!["(let f [] in A [0], let g [] in B [0])"].assert_eq(&tm.factorize().to_string());
+
+        let tm = bind(PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("y")]),
+            PatTm::res("B", [MorTm::fvar("x")]),
+        ]));
+        expect!["(let g [] in A [0], let f [] in B [0])"].assert_eq(&tm.factorize().to_string());
     }
 }
