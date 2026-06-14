@@ -1,7 +1,7 @@
 pub mod core;
 pub mod model;
 pub mod name;
-pub mod net;
+//pub mod net;
 pub mod netgen;
 pub mod ob_tm;
 pub mod prelude;

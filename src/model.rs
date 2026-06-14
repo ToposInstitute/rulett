@@ -4,7 +4,7 @@ use itertools::zip_eq;
 use pretty::RcDoc;
 use std::fmt;
 
-use super::{ob_tm::*, prelude::*, surface::tm::*, theory::*, ty::*};
+use super::{core::*, ob_tm::*, prelude::*, surface, theory::*, ty::*};
 
 /// Declaration in the definition of a rule-based model.
 pub enum ModelDecl {
@@ -19,8 +19,8 @@ pub enum ModelDecl {
     Rule {
         name: Name,
         interface: (ObTm, Ty),
-        lhs: PatTm,
-        rhs: PatTm,
+        lhs: surface::PatTm,
+        rhs: surface::PatTm,
     },
 }
 
@@ -38,8 +38,8 @@ impl ModelDecl {
         name: impl Into<Name>,
         tm: impl Into<ObTm>,
         ty: impl Into<Ty>,
-        lhs: impl Into<PatTm>,
-        rhs: impl Into<PatTm>,
+        lhs: impl Into<surface::PatTm>,
+        rhs: impl Into<surface::PatTm>,
     ) -> Self {
         Self::Rule {
             name: name.into(),
@@ -147,12 +147,16 @@ impl Model {
         name: Name,
         tm: ObTm,
         ty: Ty,
-        lhs: PatTm,
-        rhs: PatTm,
+        lhs: surface::PatTm,
+        rhs: surface::PatTm,
     ) -> Result<(), String> {
         let interface = self.check_interface(tm, ty)?;
         // TODO: Type check left- and right-hand sides!
-        let data = BasicRuleData { interface, lhs, rhs };
+        let data = BasicRuleData {
+            interface,
+            lhs: lhs.elab(),
+            rhs: rhs.elab(),
+        };
         if self.has_agent(&name) || self.rules.insert(name, data).is_some() {
             return Err(format!("{name} already defined"));
         }
@@ -182,11 +186,11 @@ impl Model {
     pub(crate) fn rule_tm(&self, name: Name, terms: Vec<MorTm>) -> RuleTm {
         let BasicRuleData { interface, lhs, rhs } = self.rules.get(&name).unwrap();
         let vars = interface.tm.vars().unwrap();
-        let mut subst = zip_eq(vars, terms.iter().cloned()).collect_vec();
+        let subst = zip_eq(vars, terms.iter().cloned()).collect_vec();
         RuleTm {
             rule: PatTm::Res(name, MorTm::List(terms)),
-            lhs: lhs.subst(&mut subst),
-            rhs: rhs.subst(&mut subst),
+            lhs: lhs.subst(&subst),
+            rhs: rhs.subst(&subst),
         }
     }
 }
@@ -229,6 +233,7 @@ pub(crate) fn toy_model_v2() -> Model {
 
 #[cfg(test)]
 fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> [ModelDecl; 5] {
+    use super::surface::*;
     [
         ModelDecl::agent(
             "A",
@@ -294,7 +299,7 @@ mod tests {
             [r] : [Res] ⊢
               bondAB [r]
                 : (A [r, empty []], B [empty []])
-                → let (s1, s2) = bond [] in (A [r, s1], B [s2])
+                → let bond [] in (A [r, 0.0], B [0.1])
             [s] : [Site] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
@@ -319,7 +324,7 @@ mod tests {
             [r] : [Res] ⊢
               bondAB [r]
                 : (A [r, emptyA []], B [emptyB []])
-                → let (s1, s2) = bond [] in (A [r, s1], B [s2])
+                → let bond [] in (A [r, 0.0], B [0.1])
             [s] : [SiteA] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];

@@ -321,6 +321,79 @@ impl PatTm {
     }
 }
 
+/// Rule term.
+///
+/// A rule term represents an indexed morphism (derived rule) including its
+/// domain (left-hand side) and codomain (right-hand side).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuleTm {
+    /// Term for rule itself.
+    pub rule: PatTm,
+    /// Term for left-hand side of rule.
+    pub lhs: PatTm,
+    /// Term for right-hand side of rule.
+    pub rhs: PatTm,
+}
+
+impl fmt::Display for RuleTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        render_doc(self.to_doc(), f)
+    }
+}
+
+impl RuleTm {
+    /// Pretty document for the rule term.
+    pub fn to_doc(&self) -> RcDoc<'static> {
+        mor_doc(self.rule.to_doc(), self.lhs.to_doc(), self.rhs.to_doc())
+    }
+
+    /// Constructs a list of rule terms.
+    pub fn list(rules: Vec<RuleTm>) -> Self {
+        let n = rules.len();
+        let (mut rule, mut lhs, mut rhs) =
+            (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+        for r in rules {
+            rule.push(r.rule);
+            lhs.push(r.lhs);
+            rhs.push(r.rhs);
+        }
+        Self {
+            rule: PatTm::list(rule),
+            lhs: PatTm::list(lhs),
+            rhs: PatTm::list(rhs),
+        }
+    }
+
+    /// Constructs an application of the tensor product to a rule term.
+    pub fn tensor(rule: RuleTm) -> Self {
+        Self {
+            rule: PatTm::tensor(rule.rule),
+            lhs: PatTm::tensor(rule.lhs),
+            rhs: PatTm::tensor(rule.rhs),
+        }
+    }
+
+    /// Restricts the rule term at free variables along a morphism term.
+    pub fn restrict(self, at: &ObTm, along: MorTm) -> Self {
+        Self {
+            rule: self.rule.restrict(at, along.clone()),
+            lhs: self.lhs.restrict(at, along.clone()),
+            rhs: self.rhs.restrict(at, along),
+        }
+    }
+
+    /// Simultaneously substitutes terms for free variables in the rule.
+    ///
+    /// Capture-avoiding due to the locally nameless representation.
+    pub fn subst(&self, subst: &[(Name, MorTm)]) -> Self {
+        Self {
+            rule: self.rule.subst(subst),
+            lhs: self.lhs.subst(subst),
+            rhs: self.rhs.subst(subst),
+        }
+    }
+}
+
 /// Pretty document for `let <bound> in <body>`, breakable after `in`.
 fn let_doc<'a>(bound: RcDoc<'a>, body: RcDoc<'a>) -> RcDoc<'a> {
     RcDoc::text("let ")
