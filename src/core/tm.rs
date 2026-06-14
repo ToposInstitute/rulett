@@ -16,14 +16,14 @@ use crate::{ob_tm::*, prelude::*};
 /// For example, in `let ⊗ [x, y] = t in ...` the variable `x` is reached by the
 /// path `[Tensor, List(0)]` and `y` by `[Tensor, List(1)]`, whereas in
 /// `let x = t in ...` the variable `x` is reached by the empty path.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BVarSegment {
     List(usize),
     Tensor,
 }
 
 /// Morphism term.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MorTm {
     /// A free variable.
     FVar(Name),
@@ -233,7 +233,7 @@ fn binding_paths(bindings: &ObTm) -> IndexMap<Name, Vec<BVarSegment>> {
 }
 
 /// Pattern term.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PatTm {
     /// A restriction of an agent or a basic rule along a morphism.
     Res(Name, MorTm),
@@ -376,35 +376,46 @@ impl PatTm {
         }
     }
 
-    fn factorize_let(bound: MorTm, body: PatTm) -> PatTm {
-        match body {
-            PatTm::Tensor(inner) if matches!(&*inner, PatTm::List(_)) => {
-                PatTm::tensor(Self::factorize_let(bound, *inner))
-            }
+    fn factorize_let(bound: MorTm, body: Self) -> Self {
+        let (result, tm) = match body {
+            PatTm::Tensor(tm) => match *tm {
+                PatTm::List(mut terms) => {
+                    (Self::try_factorize_list(bound, &mut terms), PatTm::tensor(PatTm::list(terms)))
+                }
+                tm => (Err(bound), PatTm::tensor(tm)),
+            },
             PatTm::List(mut terms) => {
-                // Get the unique term, if any, using the let binding at this level.
-                let unique_user = terms
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, tm)| tm.uses_bvar(0).then_some(i))
-                    .exactly_one();
+                (Self::try_factorize_list(bound, &mut terms), PatTm::list(terms))
+            }
+            body => (Err(bound), body),
+        };
+        match result {
+            Ok(_) => tm,
+            Err(bound) => PatTm::let_(bound, tm),
+        }
+    }
 
-                if let Ok(i) = unique_user {
-                    // The other terms lose this enclosing binder, so shift their
-                    // bound variables down to compensate.
-                    for (j, tm) in terms.iter_mut().enumerate() {
-                        if j != i {
-                            tm.shift_down(0);
-                        }
-                    }
-                    let tm = std::mem::replace(&mut terms[i], PatTm::List(vec![]));
-                    terms[i] = Self::factorize_let(bound, tm);
-                    PatTm::list(terms)
-                } else {
-                    PatTm::let_(bound, PatTm::list(terms))
+    fn try_factorize_list(bound: MorTm, terms: &mut Vec<Self>) -> Result<(), MorTm> {
+        // Get the unique term, if any, using the let binding at this level.
+        let unique_user = terms
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tm)| tm.uses_bvar(0).then_some(i))
+            .exactly_one();
+
+        if let Ok(i) = unique_user {
+            // The other terms lose this enclosing binder, so shift their
+            // bound variables down to compensate.
+            for (j, tm) in terms.iter_mut().enumerate() {
+                if j != i {
+                    tm.shift_down(0);
                 }
             }
-            other => PatTm::let_(bound, other),
+            let tm = std::mem::replace(&mut terms[i], PatTm::List(vec![]));
+            terms[i] = Self::let_(bound, tm).factorize();
+            Ok(())
+        } else {
+            Err(bound)
         }
     }
 

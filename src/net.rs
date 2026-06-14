@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use super::{prelude::*, surface::tm::*};
+use super::{core::*, prelude::*};
 
 /// Petri net, aka reaction network, derived from a rule-based model.
 ///

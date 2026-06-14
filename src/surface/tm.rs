@@ -6,7 +6,7 @@ use std::fmt;
 use crate::{core, ob_tm::*, prelude::*};
 
 /// Morphism term (sans domain term and codomain type).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MorTm {
     /// A variable.
     ///
@@ -165,7 +165,7 @@ impl MorTm {
 /// ("patterns" in Kappa) and indexed morphisms (derived rules) excluding their
 /// (co)domains. In the latter case, we follow the category theorist's tradition
 /// of an identifying an object with its identity morphism.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PatTm {
     /// A restriction of an agent or a basic rule along a morphism.
     ///

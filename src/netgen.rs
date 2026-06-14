@@ -4,7 +4,7 @@ use itertools::{chain, zip_eq};
 use std::rc::Rc;
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
 
-use super::{core::*, model::*, ob_tm::*, prelude::*, ty::*};
+use super::{core::*, model::*, net::*, ob_tm::*, prelude::*, ty::*};
 
 /// Wrapper enum for the two kinds of terms in a model.
 ///
@@ -137,7 +137,6 @@ impl<'a> NetGenerator<'a> {
         Self { model, cod_index }
     }
 
-    /*
     /// Generates a network from the model up to a specified size.
     pub fn net(&self, max_width: usize) -> Net {
         let (species, transitions): (Vec<_>, Vec<_>) = (1..=max_width)
@@ -165,7 +164,6 @@ impl<'a> NetGenerator<'a> {
         }
         net
     }
-    */
 
     /// Generates species from the model up to a specified size.
     ///
@@ -247,7 +245,7 @@ impl<'a> NetGenerator<'a> {
     }
 
     fn recurse(&self, state: SearchState, results: &mut Vec<ModelTm>) {
-        let SearchState { interface, tm, mut next_name, uf, seen } = state;
+        let SearchState { interface, tm, next_name, uf, seen } = state;
 
         // Success condition: found a closed term.
         if interface.is_empty() {
@@ -318,12 +316,13 @@ impl<'a> NetGenerator<'a> {
             for op in operations {
                 let (dom, cod) = self.model.signature().interface(op).unwrap();
 
+                let mut n = next_name;
                 let mut interface_added = dom
                     .sorts()
                     .into_iter()
                     .map(|sort| {
-                        let name = format!("x{next_name}").into();
-                        next_name += 1;
+                        let name = format!("x{n}").into();
+                        n += 1;
                         IntermediateVar { name, sort, component }
                     })
                     .collect_vec();
@@ -353,7 +352,7 @@ impl<'a> NetGenerator<'a> {
                 let state = SearchState {
                     tm: tm.restrict(restrict_at, restrict_along),
                     interface,
-                    next_name,
+                    next_name: n,
                     uf: uf.clone(),
                     seen: seen.clone(),
                 };
@@ -441,6 +440,7 @@ mod tests {
               → let bond [] in (B [0.0], (A [phos [], 0.1], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
 
+        // FIXME: Need to normalize associativity.
         //let net = expect![[r#""#]];
         //net.assert_eq(&generator.net(2).to_string());
     }
