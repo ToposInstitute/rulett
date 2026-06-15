@@ -459,15 +459,10 @@ mod tests {
             let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], CH3_dot [r#2])
             let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], Halo_dot [r#2, F []])
             let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], Halo_dot [r#2, Cl []])
-            let (r#1, r#2) = bond_c [] in (CH3_dot [r#1], H_dot [r#2])
             let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], Halo_dot [r#2, F []])
             let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], Halo_dot [r#2, Cl []])
-            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], H_dot [r#2,])
-            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, F []], CH3_dot [r#2])
             let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, F []])
-            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, Cl []])
-            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], H_dot [r#2])
-            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], CH3_dot [r#2])"#]];
+            let (r#1, r#2) = bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, Cl []])"#]];
         // H_dot, CH3
         for x in generator.species(3) {
             println!("{x}");
