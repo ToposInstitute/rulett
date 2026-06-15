@@ -273,7 +273,7 @@ impl PatTm {
             PatTm::Res(name, tm) => {
                 RcDoc::text(name.as_str()).append(RcDoc::space()).append(tm.to_doc())
             }
-            PatTm::List(patterns) => bracketed("[", "]", patterns.iter().map(PatTm::to_doc)),
+            PatTm::List(terms) => bracketed("[", "]", terms.iter().map(PatTm::to_doc)),
             PatTm::Tensor(tm) => match &**tm {
                 PatTm::List(terms) => bracketed("(", ")", terms.iter().map(PatTm::to_doc)),
                 _ => RcDoc::text("⊗ ").append(tm.to_doc()),
@@ -311,8 +311,8 @@ impl PatTm {
     pub fn subst(&self, subst: &[(Name, MorTm)]) -> Self {
         match self {
             PatTm::Res(name, tm) => PatTm::res(*name, tm.subst(subst)),
-            PatTm::List(patterns) => PatTm::list(patterns.iter().map(|p| p.subst(subst))),
-            PatTm::Tensor(pattern) => PatTm::tensor(pattern.subst(subst)),
+            PatTm::List(terms) => PatTm::list(terms.iter().map(|p| p.subst(subst))),
+            PatTm::Tensor(tm) => PatTm::tensor(tm.subst(subst)),
             PatTm::Let { bound, body } => PatTm::let_(bound.subst(subst), body.subst(subst)),
         }
     }
@@ -341,13 +341,33 @@ impl PatTm {
     fn close_rec(self, paths: &IndexMap<Name, Vec<BVarSegment>>, depth: usize) -> Self {
         match self {
             PatTm::Res(name, tm) => PatTm::res(name, tm.close_rec(paths, depth)),
-            PatTm::List(patterns) => {
-                PatTm::list(patterns.into_iter().map(|p| p.close_rec(paths, depth)))
-            }
-            PatTm::Tensor(pattern) => PatTm::tensor(pattern.close_rec(paths, depth)),
+            PatTm::List(terms) => PatTm::list(terms.into_iter().map(|p| p.close_rec(paths, depth))),
+            PatTm::Tensor(tm) => PatTm::tensor(tm.close_rec(paths, depth)),
             PatTm::Let { bound, body } => {
                 PatTm::let_(bound.close_rec(paths, depth), body.close_rec(paths, depth + 1))
             }
+        }
+    }
+
+    /// Normalizes tensors by applying (unbiased) associativity and unitality.
+    pub fn associate(self) -> Self {
+        match self {
+            PatTm::Res(_, _) => self,
+            PatTm::List(terms) => PatTm::list(terms.into_iter().map(|tm| tm.associate())),
+            PatTm::Tensor(tm) => match *tm {
+                PatTm::List(terms) => {
+                    match terms
+                        .into_iter()
+                        .flat_map(|tm| tm.associate().collect_tensor())
+                        .exactly_one()
+                    {
+                        Ok(tm) => tm,
+                        Err(terms) => PatTm::tensor(PatTm::list(terms)),
+                    }
+                }
+                _ => PatTm::tensor(tm.associate()),
+            },
+            PatTm::Let { bound, body } => PatTm::let_(bound, body.associate()),
         }
     }
 
@@ -370,7 +390,7 @@ impl PatTm {
     pub fn factorize(self) -> Self {
         match self {
             PatTm::Res(..) => self,
-            PatTm::List(patterns) => PatTm::list(patterns.into_iter().map(Self::factorize)),
+            PatTm::List(terms) => PatTm::list(terms.into_iter().map(Self::factorize)),
             PatTm::Tensor(tm) => PatTm::tensor(tm.factorize()),
             PatTm::Let { bound, body } => Self::factorize_let(bound, body.factorize()),
         }
@@ -395,7 +415,7 @@ impl PatTm {
         }
     }
 
-    fn try_factorize_list(bound: MorTm, terms: &mut Vec<Self>) -> Result<(), MorTm> {
+    fn try_factorize_list(bound: MorTm, terms: &mut [Self]) -> Result<(), MorTm> {
         // Get the unique term, if any, using the let binding at this level.
         let unique_user = terms
             .iter()
@@ -423,8 +443,8 @@ impl PatTm {
     fn uses_bvar(&self, depth: usize) -> bool {
         match self {
             PatTm::Res(_, tm) => tm.uses_bvar(depth),
-            PatTm::List(patterns) => patterns.iter().any(|p| p.uses_bvar(depth)),
-            PatTm::Tensor(pattern) => pattern.uses_bvar(depth),
+            PatTm::List(terms) => terms.iter().any(|p| p.uses_bvar(depth)),
+            PatTm::Tensor(tm) => tm.uses_bvar(depth),
             PatTm::Let { bound, body } => bound.uses_bvar(depth) || body.uses_bvar(depth + 1),
         }
     }
@@ -433,8 +453,8 @@ impl PatTm {
     fn shift_down(&mut self, depth: usize) {
         match self {
             PatTm::Res(_, tm) => tm.shift_down(depth),
-            PatTm::List(patterns) => patterns.iter_mut().for_each(|p| p.shift_down(depth)),
-            PatTm::Tensor(pattern) => pattern.shift_down(depth),
+            PatTm::List(terms) => terms.iter_mut().for_each(|p| p.shift_down(depth)),
+            PatTm::Tensor(tm) => tm.shift_down(depth),
             PatTm::Let { bound, body } => {
                 bound.shift_down(depth);
                 body.shift_down(depth + 1);

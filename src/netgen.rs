@@ -156,8 +156,8 @@ impl<'a> NetGenerator<'a> {
         }
         println!("{net}");
         for rule in transitions {
-            let src = rule.lhs.factorize().collect_tensor();
-            let tgt = rule.rhs.factorize().collect_tensor();
+            let src = rule.lhs.associate().factorize().collect_tensor();
+            let tgt = rule.rhs.associate().factorize().collect_tensor();
             net.add_transition(rule.rule, &src, &tgt)
                 .map_err(|tm| tm.to_string())
                 .expect("Species should already be added");
@@ -440,7 +440,7 @@ mod tests {
               → let bond [] in (B [0.0], (A [phos [], 0.1], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
 
-        // FIXME: Need to normalize associativity.
+        // FIXME: Need to factorize with factors of length greater than one.
         //let net = expect![[r#""#]];
         //net.assert_eq(&generator.net(2).to_string());
     }
