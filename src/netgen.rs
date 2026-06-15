@@ -440,7 +440,7 @@ mod tests {
               → let bond [] in (B [0.0], (A [phos [], 0.1], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
 
-        // FIXME: Need to factorize with factors of length greater than one.
+        // FIXME: Need to normalize symmetries.
         //let net = expect![[r#""#]];
         //net.assert_eq(&generator.net(2).to_string());
     }

@@ -392,51 +392,48 @@ impl PatTm {
             PatTm::Res(..) => self,
             PatTm::List(terms) => PatTm::list(terms.into_iter().map(Self::factorize)),
             PatTm::Tensor(tm) => PatTm::tensor(tm.factorize()),
-            PatTm::Let { bound, body } => Self::factorize_let(bound, body.factorize()),
-        }
-    }
-
-    fn factorize_let(bound: MorTm, body: Self) -> Self {
-        let (result, tm) = match body {
-            PatTm::Tensor(tm) => match *tm {
-                PatTm::List(mut terms) => {
-                    (Self::try_factorize_list(bound, &mut terms), PatTm::tensor(PatTm::list(terms)))
-                }
-                tm => (Err(bound), PatTm::tensor(tm)),
+            PatTm::Let { bound, body } => match body.factorize() {
+                PatTm::Tensor(tm) => match *tm {
+                    PatTm::List(terms) => Self::factorize_bound_tensor(bound, terms),
+                    tm => PatTm::let_(bound, PatTm::tensor(tm)),
+                },
+                body => PatTm::let_(bound, body),
             },
-            PatTm::List(mut terms) => {
-                (Self::try_factorize_list(bound, &mut terms), PatTm::list(terms))
-            }
-            body => (Err(bound), body),
-        };
-        match result {
-            Ok(_) => tm,
-            Err(bound) => PatTm::let_(bound, tm),
         }
     }
 
-    fn try_factorize_list(bound: MorTm, terms: &mut [Self]) -> Result<(), MorTm> {
-        // Get the unique term, if any, using the let binding at this level.
-        let unique_user = terms
-            .iter()
-            .enumerate()
-            .filter_map(|(i, tm)| tm.uses_bvar(0).then_some(i))
-            .exactly_one();
-
-        if let Ok(i) = unique_user {
-            // The other terms lose this enclosing binder, so shift their
-            // bound variables down to compensate.
-            for (j, tm) in terms.iter_mut().enumerate() {
-                if j != i {
-                    tm.shift_down(0);
-                }
-            }
-            let tm = std::mem::replace(&mut terms[i], PatTm::List(vec![]));
-            terms[i] = Self::let_(bound, tm).factorize();
-            Ok(())
-        } else {
-            Err(bound)
+    fn factorize_bound_tensor(bound: MorTm, terms: Vec<Self>) -> Self {
+        // Continue if some, but not all, of the terms use the binding.
+        let uses = terms.iter().map(|tm| tm.uses_bvar(0)).collect_vec();
+        let n_users = uses.iter().filter(|&&b| b).count();
+        let n = terms.len();
+        if n_users == 0 || n_users == n {
+            return PatTm::let_(bound, PatTm::tensor(PatTm::list(terms)));
         }
+
+        let mut users = Vec::with_capacity(n_users);
+        let mut remaining = Vec::with_capacity(n - n_users);
+        let mut index = None;
+        for (i, (mut tm, is_used)) in terms.into_iter().zip(uses).enumerate() {
+            if is_used {
+                // Remember where the subtensor of users should be inserted.
+                index.get_or_insert(i);
+                users.push(tm);
+            } else {
+                // The other terms lose this enclosing binder, so shift their
+                // bound variables down to compensate.
+                tm.shift_down(0);
+                remaining.push(tm);
+            }
+        }
+
+        let factor = if users.len() == 1 {
+            users.into_iter().next().unwrap()
+        } else {
+            PatTm::tensor(PatTm::list(users))
+        };
+        remaining.insert(index.unwrap(), Self::let_(bound, factor).factorize());
+        PatTm::tensor(PatTm::list(remaining))
     }
 
     /// Returns whether a bound variable at the given depth is used.
@@ -621,7 +618,7 @@ mod tests {
         .bind(&ObTm::tensor([ObTm::var("x"), ObTm::var("y")]), MorTm::app("f", []));
         expect!["(let f [] in A [0.0, 0.1], B [])"].assert_eq(&tm.factorize().to_string());
 
-        // Wraps a body in `let x = f [] in let y = g [] in ...`.
+        // Nested bindings.
         fn bind(body: PatTm) -> PatTm {
             body.bind(&ObTm::var("y"), MorTm::app("g", []))
                 .bind(&ObTm::var("x"), MorTm::app("f", []))
@@ -644,5 +641,14 @@ mod tests {
             PatTm::res("B", [MorTm::fvar("x")]),
         ]));
         expect!["(let g [] in A [0], let f [] in B [0])"].assert_eq(&tm.factorize().to_string());
+
+        // Binding multiple terms in a tensor.
+        let tm = PatTm::tensor([
+            PatTm::res("A", [MorTm::fvar("x")]),
+            PatTm::res("K", []),
+            PatTm::res("B", [MorTm::fvar("y")]),
+        ])
+        .bind(&ObTm::tensor([ObTm::var("x"), ObTm::var("y")]), MorTm::app("f", []));
+        expect!["(let f [] in (A [0.0], B [0.1]), K [])"].assert_eq(&tm.factorize().to_string());
     }
 }
