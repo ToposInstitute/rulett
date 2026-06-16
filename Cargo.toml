@@ -5,6 +5,7 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
+derive_more = { version = "2", features = ["unwrap"] }
 imbl = "7"
 indexmap = "2.14.0"
 itertools = "0.14.0"

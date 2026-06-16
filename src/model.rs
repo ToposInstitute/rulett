@@ -4,7 +4,7 @@ use itertools::zip_eq;
 use pretty::RcDoc;
 use std::fmt;
 
-use super::{prelude::*, theory::*, tm::*, ty::*};
+use super::{core::*, ob_tm::*, prelude::*, surface, theory::*, ty::*};
 
 /// Declaration in the definition of a rule-based model.
 pub enum ModelDecl {
@@ -19,8 +19,8 @@ pub enum ModelDecl {
     Rule {
         name: Name,
         interface: (ObTm, Ty),
-        lhs: PatTm,
-        rhs: PatTm,
+        lhs: surface::PatTm,
+        rhs: surface::PatTm,
     },
 }
 
@@ -38,8 +38,8 @@ impl ModelDecl {
         name: impl Into<Name>,
         tm: impl Into<ObTm>,
         ty: impl Into<Ty>,
-        lhs: impl Into<PatTm>,
-        rhs: impl Into<PatTm>,
+        lhs: impl Into<surface::PatTm>,
+        rhs: impl Into<surface::PatTm>,
     ) -> Self {
         Self::Rule {
             name: name.into(),
@@ -147,12 +147,16 @@ impl Model {
         name: Name,
         tm: ObTm,
         ty: Ty,
-        lhs: PatTm,
-        rhs: PatTm,
+        lhs: surface::PatTm,
+        rhs: surface::PatTm,
     ) -> Result<(), String> {
         let interface = self.check_interface(tm, ty)?;
         // TODO: Type check left- and right-hand sides!
-        let data = BasicRuleData { interface, lhs, rhs };
+        let data = BasicRuleData {
+            interface,
+            lhs: lhs.elab(),
+            rhs: rhs.elab(),
+        };
         if self.has_agent(&name) || self.rules.insert(name, data).is_some() {
             return Err(format!("{name} already defined"));
         }
@@ -181,12 +185,12 @@ impl Model {
     /// Constructs a rule term corresponding to a basic rule.
     pub(crate) fn rule_tm(&self, name: Name, terms: Vec<MorTm>) -> RuleTm {
         let BasicRuleData { interface, lhs, rhs } = self.rules.get(&name).unwrap();
-        let vars = interface.tm.collect_vars().unwrap();
-        let mut subst = zip_eq(vars, terms.iter().cloned()).collect_vec();
+        let vars = interface.tm.vars().unwrap();
+        let subst = zip_eq(vars, terms.iter().cloned()).collect_vec();
         RuleTm {
             rule: PatTm::Res(name, MorTm::List(terms)),
-            lhs: lhs.subst(&mut subst),
-            rhs: rhs.subst(&mut subst),
+            lhs: lhs.subst(&subst),
+            rhs: rhs.subst(&subst),
         }
     }
 }
@@ -216,19 +220,20 @@ impl fmt::Display for Model {
 /// A toy example of a ruled-based model (variant 1).
 #[cfg(test)]
 pub(crate) fn toy_model_v1() -> Model {
-    let decls = toy_model_decls("Site", "Site");
+    let decls = toy_model_decls("Site", "Site", "empty", "empty");
     Model::parse(toy_signature_v1(), decls).unwrap()
 }
 
 /// A toy example of a ruled-based model (variant 2).
 #[cfg(test)]
 pub(crate) fn toy_model_v2() -> Model {
-    let decls = toy_model_decls("SiteA", "SiteB");
+    let decls = toy_model_decls("SiteA", "SiteB", "emptyA", "emptyB");
     Model::parse(toy_signature_v2(), decls).unwrap()
 }
 
 #[cfg(test)]
-fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
+fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> [ModelDecl; 5] {
+    use super::surface::*;
     [
         ModelDecl::agent(
             "A",
@@ -242,11 +247,11 @@ fn toy_model_decls(site_a: &str, site_b: &str) -> [ModelDecl; 5] {
             [ObTm::var("r")],
             [Ty::sort("Res")],
             PatTm::tensor([
-                PatTm::res("A", [MorTm::var("r"), MorTm::app("empty", [])]),
-                PatTm::res("B", [MorTm::app("empty", [])]),
+                PatTm::res("A", [MorTm::var("r"), MorTm::app(empty_a, [])]),
+                PatTm::res("B", [MorTm::app(empty_b, [])]),
             ]),
             PatTm::let_(
-                [ObTm::var("s1"), ObTm::var("s2")],
+                ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
@@ -294,7 +299,7 @@ mod tests {
             [r] : [Res] ⊢
               bondAB [r]
                 : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+                → let bond [] in (A [r, 0.0], B [0.1])
             [s] : [Site] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];
@@ -318,8 +323,8 @@ mod tests {
             #/ rules:
             [r] : [Res] ⊢
               bondAB [r]
-                : (A [r, empty []], B [empty []])
-                → let [s1, s2] = bond [] in (A [r, s1], B [s2])
+                : (A [r, emptyA []], B [emptyB []])
+                → let bond [] in (A [r, 0.0], B [0.1])
             [s] : [SiteA] ⊢
               phosphorylate [s] : (A [unphos [], s], K []) → (A [phos [], s], K [])
         "#]];

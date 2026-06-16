@@ -1,4 +1,7 @@
 //! Types for rule-based models.
+//!
+//! In this linear type theory, types are simple enough that they can be shared
+//! across [surface](super::surface) and [core](super::core) terms.
 
 use pretty::RcDoc;
 use std::fmt;
@@ -9,7 +12,7 @@ use super::prelude::*;
 ///
 /// The (meta) type of a [type](Ty) is a kind. In double-categorical logic,
 /// kinds correspond to object types in the double theory.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// The base or primitive kind, often denoted `*`.
     Prim,
@@ -64,7 +67,7 @@ impl Kind {
 ///
 /// In double-categorical logic, types correspond to objects in a model of the
 /// double theory.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ty {
     /// A primitive type, aka a sort, belonging to the signature.
     Sort(Name),
@@ -120,7 +123,7 @@ impl Ty {
     }
 
     /// Collects all the sorts that appear in the type.
-    pub fn collect_sorts(&self) -> Vec<Name> {
+    pub fn sorts(&self) -> Vec<Name> {
         fn recurse(sorts: &mut Vec<Name>, ty: &Ty) {
             match ty {
                 Ty::Sort(name) => sorts.push(*name),
@@ -177,15 +180,15 @@ mod tests {
     #[test]
     fn collect_sorts() {
         // Sorts.
-        assert_eq!(Ty::sort("X").collect_sorts(), vec![name("X")]);
+        assert_eq!(Ty::sort("X").sorts(), vec![name("X")]);
 
         // Lists.
         let ty = Ty::list([Ty::sort("X"), Ty::sort("Y"), Ty::sort("X")]);
-        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y"), name("X")]);
+        assert_eq!(ty.sorts(), vec![name("X"), name("Y"), name("X")]);
 
         // Tensors.
         let ty = Ty::tensor([Ty::sort("X"), Ty::sort("Y")]);
-        assert_eq!(ty.collect_sorts(), vec![name("X"), name("Y")]);
+        assert_eq!(ty.sorts(), vec![name("X"), name("Y")]);
     }
 
     #[test]
