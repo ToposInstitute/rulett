@@ -16,14 +16,14 @@ use crate::{ob_tm::*, prelude::*};
 /// For example, in `let ⊗ [x, y] = t in ...` the variable `x` is reached by the
 /// path `[Tensor, List(0)]` and `y` by `[Tensor, List(1)]`, whereas in
 /// `let x = t in ...` the variable `x` is reached by the empty path.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BVarSegment {
     List(usize),
     Tensor,
 }
 
 /// Morphism term.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MorTm {
     /// A free variable.
     FVar(Name),
@@ -233,7 +233,7 @@ fn binding_paths(bindings: &ObTm) -> IndexMap<Name, Vec<BVarSegment>> {
 }
 
 /// Pattern term.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PatTm {
     /// A restriction of an agent or a basic rule along a morphism.
     Res(Name, MorTm),
@@ -349,7 +349,18 @@ impl PatTm {
         }
     }
 
-    /// Normalizes tensors by applying (unbiased) associativity and unitality.
+    /// Normalizes tensor products of patterns.
+    ///
+    /// Handles associativity, unitality, and symmetry of the monoidal product.
+    pub fn normalize(self) -> Self {
+        let mut tm = self.associate();
+        tm.sort();
+        tm
+    }
+
+    /// Recursively applies the associativity and unitality of tensors.
+    ///
+    /// A normalization procedure for the tensor as an (unbiased) monoidal product.
     pub fn associate(self) -> Self {
         match self {
             PatTm::Res(_, _) => self,
@@ -368,6 +379,24 @@ impl PatTm {
                 _ => PatTm::tensor(tm.associate()),
             },
             PatTm::Let { bound, body } => PatTm::let_(bound, body.associate()),
+        }
+    }
+
+    /// Recursively sorts the terms in tensors of lists, in place.
+    ///
+    /// A normalization procedure for the *symmetric* aspect of the tensor as an
+    /// (unbiased) symmetric monoidal product.
+    pub fn sort(&mut self) {
+        match self {
+            PatTm::Res(_, _) => {}
+            PatTm::List(terms) => terms.iter_mut().for_each(Self::sort),
+            PatTm::Tensor(tm) => {
+                tm.sort();
+                if let PatTm::List(terms) = &mut **tm {
+                    terms.sort();
+                }
+            }
+            PatTm::Let { body, .. } => body.sort(),
         }
     }
 

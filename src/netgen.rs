@@ -169,12 +169,11 @@ impl<'a> NetGenerator<'a> {
 
         let mut net = Net::new();
         for tm in species {
-            net.add_species(tm);
+            net.add_species(tm.normalize());
         }
-        println!("{net}");
         for rule in transitions {
-            let src = rule.lhs.associate().factorize().collect_tensor();
-            let tgt = rule.rhs.associate().factorize().collect_tensor();
+            let src = rule.lhs.normalize().factorize().collect_tensor();
+            let tgt = rule.rhs.normalize().factorize().collect_tensor();
             net.add_transition(rule.rule, &src, &tgt)
                 .map_err(|tm| tm.to_string())
                 .expect("Species should already be added");
@@ -184,7 +183,8 @@ impl<'a> NetGenerator<'a> {
 
     /// Generates species from the model up to a specified size.
     ///
-    /// For definition of *species*, see [`Net`].
+    /// For definition of *species*, see [`Net`]. The resulting species are not
+    /// necessarily in normal form.
     pub fn species(&self, max_agents: usize) -> impl Iterator<Item = PatTm> {
         (1..=max_agents)
             .flat_map(|n| self.model.agent_names().combinations_with_replacement(n))
@@ -194,7 +194,8 @@ impl<'a> NetGenerator<'a> {
 
     /// Generates transitions from the model up to a specified size.
     ///
-    /// For the definition of *transition*, see [`Net`].
+    /// For the definition of *transition*, see [`Net`]. The resulting
+    /// transitions are not necessarily in normal form.
     pub fn transitions(&self, max_rules: usize) -> impl Iterator<Item = RuleTm> {
         (1..=max_rules)
             .flat_map(|n| {
@@ -458,9 +459,29 @@ mod tests {
               → let bond [] in (B [0.1], (A [phos [], 0.0], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
 
-        // FIXME: Need to normalize symmetries.
-        //let net = expect![[r#""#]];
-        //net.assert_eq(&generator.net(2).to_string());
+        let net = expect![[r#"
+            #/ species:
+            A [unphos [], emptyA []]
+            A [phos [], emptyA []]
+            B [emptyB []]
+            K []
+            let bond [] in (A [unphos [], 0.0], B [0.1])
+            let bond [] in (A [phos [], 0.0], B [0.1])
+            #/ transitions:
+            bondAB [unphos []]
+              : [A [unphos [], emptyA []], B [emptyB []]]
+              → [let bond [] in (A [unphos [], 0.0], B [0.1])]
+            bondAB [phos []]
+              : [A [phos [], emptyA []], B [emptyB []]]
+              → [let bond [] in (A [phos [], 0.0], B [0.1])]
+            phosphorylate [emptyA []]
+              : [A [unphos [], emptyA []], K []]
+              → [A [phos [], emptyA []], K []]
+            let bond [] in (B [0.1], phosphorylate [0.0])
+              : [let bond [] in (A [unphos [], 0.0], B [0.1]), K []]
+              → [let bond [] in (A [phos [], 0.0], B [0.1]), K []]
+        "#]];
+        net.assert_eq(&generator.net(2).to_string());
     }
 
     #[test]
