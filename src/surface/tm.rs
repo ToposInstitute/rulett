@@ -1,4 +1,7 @@
 //! Terms in surface syntax.
+//!
+//! In the surface syntax, terms use a fully *named* representation: both free
+//! and bound [variables](MorTm::Var) are ordinary names.
 
 use pretty::RcDoc;
 use std::fmt;

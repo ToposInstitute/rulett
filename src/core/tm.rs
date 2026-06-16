@@ -1,17 +1,22 @@
 //! Terms in core syntax.
+//!
+//! In the core syntax, terms use the *locally nameless* representation: [free
+//! variables](MorTm::FVar) are ordinary names whereas [bound
+//! variables](MorTm::BVar) use *de Bruijn indices* (along with a second
+//! component for destructuring). Thus, closed terms are already quotiented by
+//! alpha-equivalence.
 
 use pretty::RcDoc;
 use std::fmt;
 
 use crate::{ob_tm::*, prelude::*};
 
-/// A segment of a path into the structure bound by a let binding.
+/// A segment of a path into the object term bound by a let binding.
 ///
 /// A [bound variable](MorTm::BVar) refers to an enclosing let binding by its de
 /// Bruijn index. Because a let binding may destructure a list or a tensor
-/// rather than bind a single variable, the index alone does not identify which
-/// component of the binding is meant; a sequence of segments forms a path to
-/// the variable.
+/// product rather than bind a single variable, a sequence of segments forming a
+/// path to the variable is also included.
 ///
 /// For example, in `let ⊗ [x, y] = t in ...` the variable `x` is reached by the
 /// path `[Tensor, List(0)]` and `y` by `[Tensor, List(1)]`, whereas in

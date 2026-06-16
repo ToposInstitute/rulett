@@ -1,4 +1,7 @@
 //! Types for rule-based models.
+//!
+//! In this linear type theory, types are simple enough that they can be shared
+//! across [surface](super::surface) and [core](super::core) terms.
 
 use pretty::RcDoc;
 use std::fmt;

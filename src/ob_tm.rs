@@ -1,4 +1,7 @@
-//! Object terms, shared by the surface and core syntax.
+//! Object terms for rule-based models.
+//!
+//! Like [types](super::ty), object terms are simple enough to be shared across
+//! surface and core syntax, in contrast to morphism and pattern terms.
 
 use pretty::RcDoc;
 use std::fmt;
