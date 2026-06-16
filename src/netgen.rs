@@ -1,5 +1,6 @@
 //! Network generation from a rule-based model.
 
+use derive_more::Unwrap;
 use itertools::{chain, zip_eq};
 use std::rc::Rc;
 use union_find::{QuickUnionUf, UnionBySize, UnionFind};
@@ -11,29 +12,13 @@ use super::{core::*, model::*, net::*, ob_tm::*, prelude::*, ty::*};
 /// This enum exists because the algorithms to generate species or transitions
 /// are essentially the same and thus can operate generically over this type
 /// instead of being duplicated for each case.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Unwrap)]
 pub enum ModelTm {
     Pat(PatTm),
     Rule(RuleTm),
 }
 
 impl ModelTm {
-    /// Deconstructor for [`Pat`](Self::Pat) variant.
-    fn take_pattern(self) -> Option<PatTm> {
-        match self {
-            Self::Pat(tm) => Some(tm),
-            Self::Rule(_) => None,
-        }
-    }
-
-    /// Deconstructor for the [`Rule`](Self::Rule) variant.
-    fn take_rule(self) -> Option<RuleTm> {
-        match self {
-            Self::Rule(tm) => Some(tm),
-            Self::Pat(_) => None,
-        }
-    }
-
     /// Constructs a model term corresponding to an agent or basic rule.
     fn basic(model: &Model, name: Name, terms: Vec<MorTm>) -> Option<Self> {
         if model.has_agent(&name) {
@@ -68,7 +53,7 @@ impl ModelTm {
             ModelTm::Rule(RuleTm::list(rules))
         } else {
             // Otherwise, we have a list of patterns.
-            let patterns = terms.into_iter().map(|tm| tm.take_pattern().unwrap());
+            let patterns = terms.into_iter().map(|tm| tm.unwrap_pat());
             ModelTm::Pat(PatTm::list(patterns))
         }
     }
@@ -87,11 +72,21 @@ pub struct NetGenerator<'a> {
     /// Model to generate from.
     model: &'a Model,
 
-    /// Index from flattened operation codomains to operation names.
+    /// Index of co-applicable operations by their flattened codomains.
     ///
-    /// Note that operations are indexed on *all* unique permutations of their
-    /// codomain's sorts.
-    cod_index: HashMap<Vec<Name>, Vec<Name>>,
+    /// Note that each operation is indexed on all unique permutations of the
+    /// sorts comprising its flattened codomain.
+    op_index: HashMap<Vec<Name>, Vec<OpIndexEntry>>,
+}
+
+/// An entry in the index of co-applicable operations.
+struct OpIndexEntry {
+    /// Name of operation.
+    operation: Name,
+
+    /// Permutation reordering the matched variables (given by the index key) to
+    /// agree with the operation's codomain.
+    permutation: Vec<usize>,
 }
 
 /// State maintained by search algorithm for network generation.
@@ -126,15 +121,37 @@ struct IntermediateVar {
 impl<'a> NetGenerator<'a> {
     /// Constructs a network generator for the given model.
     pub fn new(model: &'a Model) -> Self {
-        let mut cod_index = HashMap::<_, Vec<_>>::new();
+        let op_index = Self::build_op_index(model);
+        Self { model, op_index }
+    }
+
+    /// Constructs the operation index for a model.
+    fn build_op_index(model: &Model) -> HashMap<Vec<Name>, Vec<OpIndexEntry>> {
+        let mut index = HashMap::<_, Vec<_>>::new();
         for (name, _, cod) in model.signature().operations() {
             let sorts = cod.sorts();
             let n = sorts.len();
-            for ordering in sorts.into_iter().permutations(n).unique() {
-                cod_index.entry(ordering).or_default().push(name);
+            let mut seen = HashSet::new();
+            for p in (0..n).permutations(n) {
+                // Only store *unique* permutations of the sorts.
+                let key = p.iter().map(|&i| sorts[i]).collect_vec();
+                if seen.contains(&key) {
+                    continue;
+                }
+                seen.insert(key.clone());
+
+                // Need inverse permutation to order variables for binding.
+                let mut p_inv = vec![0; n];
+                for (j, pos) in p.into_iter().enumerate() {
+                    p_inv[pos] = j;
+                }
+                index
+                    .entry(key)
+                    .or_default()
+                    .push(OpIndexEntry { operation: name, permutation: p_inv });
             }
         }
-        Self { model, cod_index }
+        index
     }
 
     /// Generates a network from the model up to a specified size.
@@ -172,7 +189,7 @@ impl<'a> NetGenerator<'a> {
         (1..=max_agents)
             .flat_map(|n| self.model.agent_names().combinations_with_replacement(n))
             .flat_map(|agents| self.find(agents))
-            .map(|tm| tm.take_pattern().unwrap_or_else(|| unreachable!()))
+            .map(|tm| tm.unwrap_pat())
     }
 
     /// Generates transitions from the model up to a specified size.
@@ -186,7 +203,7 @@ impl<'a> NetGenerator<'a> {
             })
             .filter(|names| names.iter().any(|name| self.model.has_rule(name)))
             .flat_map(|names| self.find(names))
-            .map(|tm| tm.take_rule().unwrap_or_else(|| unreachable!()))
+            .map(|tm| tm.unwrap_rule())
     }
 
     fn find(&self, generator_names: Vec<Name>) -> Vec<ModelTm> {
@@ -267,7 +284,7 @@ impl<'a> NetGenerator<'a> {
 
             // Get co-applicable operations, bailing early if there are none.
             let sorts = idxs.iter().map(|&i| interface[i].sort).collect_vec();
-            let Some(operations) = self.cod_index.get(&sorts).filter(|ops| !ops.is_empty()) else {
+            let Some(operations) = self.op_index.get(&sorts).filter(|ops| !ops.is_empty()) else {
                 continue;
             };
 
@@ -313,7 +330,7 @@ impl<'a> NetGenerator<'a> {
                 .collect_vec();
 
             // Restrict along each co-applicable operation and recurse.
-            for op in operations {
+            for OpIndexEntry { operation: op, permutation: perm } in operations {
                 let (dom, cod) = self.model.signature().interface(op).unwrap();
 
                 let mut n = next_name;
@@ -337,7 +354,8 @@ impl<'a> NetGenerator<'a> {
                     continue;
                 }
 
-                let vars = idxs.iter().map(|&i| ObTm::var(interface[i].name));
+                // Reorder matched variables to align with operation's codomain.
+                let vars = perm.iter().map(|&j| ObTm::var(interface[idxs[j]].name));
                 let restrict_at = if matches!(cod, Ty::Sort(_)) {
                     vars.exactly_one().unwrap()
                 } else {
@@ -435,9 +453,9 @@ mod tests {
             phosphorylate [emptyA []]
               : (A [unphos [], emptyA []], K [])
               → (A [phos [], emptyA []], K [])
-            let bond [] in (B [0.0], phosphorylate [0.1])
-              : let bond [] in (B [0.0], (A [unphos [], 0.1], K []))
-              → let bond [] in (B [0.0], (A [phos [], 0.1], K []))"#]];
+            let bond [] in (B [0.1], phosphorylate [0.0])
+              : let bond [] in (B [0.1], (A [unphos [], 0.0], K []))
+              → let bond [] in (B [0.1], (A [phos [], 0.0], K []))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
 
         // FIXME: Need to normalize symmetries.
