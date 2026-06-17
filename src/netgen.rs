@@ -733,7 +733,7 @@ mod tests {
         let model = model::toy_model_directionality();
         let generator = NetGenerator::new(&model);
 
-        // @Evan: This shows the problem that the C is bound to the wrong A. It should be boud to the B-bound.
+        // @Evan: This shows the problem that the C is bound to the wrong A. It should be bound to the A that is bound to B.
         // let bond [] in
         // let bond_AB [] in
         // (
