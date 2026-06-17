@@ -555,16 +555,22 @@ mod tests {
             let bond [] in (M [iota_SiteA [0.0]], phosphorylate [0.1])
               : let bond [] in
                 (
-                  (M [iota_B], M [iota_SiteA [0.0]]),
+                  M [iota_SiteA [0.0]],
                   ((M [iota_A], M [iota_SiteB 0.1], M [iota_Res unphos []]), (M [iota_K]))
                 )
               → let bond [] in
                 (
-                  (M [iota_B], M [iota_SiteA [0.0]]),
+                  M [iota_SiteA [0.0]],
                   ((M [iota_A], M [iota_SiteB 0.1], M [iota_Res phos []]), (M [iota_K]))
-                )"#]];
+                )"#]]; // Note that 
         transitions.assert_eq(&generator.transitions(2).join("\n"));
     }
+    // The algorithm is doing what it is supposed to, but for the RHS of the rule I actually intended M [iota_B] to be present:
+    // let bond [] in
+    // (
+    // (M [iota_B], M [iota_SiteA [0.0]]),
+    // ((M [iota_A], M [iota_SiteB 0.1], M [iota_Res phos []]), (M [iota_K]))
+    // )
 
     #[test]
     fn toy_model_species_granularity_2() {
@@ -634,12 +640,12 @@ mod tests {
             let bond [] in (M [iota_SiteA [0.0]], phosphorylate [0.1])
               : let bond [] in
                 (
-                  (M [iota_B], M [iota_SiteA [0.0]]),
+                  M [iota_SiteA [0.0]],
                   ((M [iota_A], M [iota_SiteB 0.1], M [iota_Res unphos []]), (M [iota_K]))
                 )
               → let bond [] in
                 (
-                  (M [iota_B], M [iota_SiteA [0.0]]),
+                  M [iota_SiteA [0.0]],
                   ((M [iota_A], M [iota_SiteB 0.1], M [iota_Res phos []]), (M [iota_K]))
                 )"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n"));
