@@ -290,7 +290,8 @@ fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> 
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("r"), MorTm::var("s1")]),
-                    PatTm::res("B", [MorTm::var("s2")]),
+                    PatTm::res("B", [MorTm::var("t2")])
+                        .subst(&mut vec![(name("t2"), MorTm::var("s2"))]), // TODO: ask Evan how to do this
                 ]),
             ),
         ),
@@ -312,13 +313,14 @@ fn toy_model_decls(site_a: &str, site_b: &str, empty_a: &str, empty_b: &str) -> 
 
 #[cfg(test)]
 fn model_decls_species_granularity() -> [ModelDecl; 3] {
-    let re_a = PatTm::res("M", MorTm::var("iota_A"));
-    let re_b = PatTm::res("M", MorTm::var("iota_B"));
-    let re_k = PatTm::res("M", MorTm::var("iota_K"));
+    use super::surface::*;
+    let re_a = PatTm::res("M", [MorTm::var("iota_A")]);
+    let re_b = PatTm::res("M", [MorTm::var("iota_B")]);
+    let re_k = PatTm::res("M", [MorTm::var("iota_K")]);
 
-    let site_a = PatTm::res("M", MorTm::var("iota_SiteA"));
-    let site_b = PatTm::res("M", MorTm::var("iota_SiteB"));
-    let res = PatTm::res("M", MorTm::var("iota_Res"));
+    let site_a = PatTm::res("M", [MorTm::var("iota_SiteA")]);
+    let site_b = PatTm::res("M", [MorTm::var("iota_SiteB")]);
+    let res = PatTm::res("M", [MorTm::var("iota_Res")]);
 
     let a: PatTm = PatTm::tensor([re_a, site_b, res]);
     let b = PatTm::tensor([re_b, site_a]);
@@ -340,11 +342,14 @@ fn model_decls_species_granularity() -> [ModelDecl; 3] {
     )]);
     let ab = PatTm::tensor([a, b]);
     let ab_complex = ab.subst(&mut vec![
-        (name("iota_SiteA"), MorTm::app("iota_SiteA", MorTm::app("s1", []))),
-        (name("iota_SiteB"), MorTm::app("iota_SiteB", MorTm::app("s2", []))),
+        (name("iota_SiteA"), MorTm::app("iota_SiteA", MorTm::var("s1"))),
+        (name("iota_SiteB"), MorTm::app("iota_SiteB", MorTm::var("s2"))),
     ]);
-    let ab_complex =
-        PatTm::let_([ObTm::var("s1"), ObTm::var("s2")], MorTm::app("bond", []), ab_complex); // TODO: ask Evan how to do this
+    let ab_complex = PatTm::let_(
+        ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
+        MorTm::app("bond", []),
+        ab_complex,
+    ); // TODO: ask Evan how to do this
     [
         ModelDecl::agent("M", [ObTm::var("m")], [Ty::sort("ReMonomer")]),
         ModelDecl::rule(
@@ -352,14 +357,12 @@ fn model_decls_species_granularity() -> [ModelDecl; 3] {
             [ObTm::var("b"), ObTm::var("r")],
             [Ty::sort("ReB"), Ty::sort("Res")],
             PatTm::tensor([
-                a_free.subst(&mut vec![(
-                    name("iota_Res"),
-                    MorTm::app("iota_Res", MorTm::app("r", [])),
-                )]), // @Evan: I believe the substitution here is required to introduce the variable "r"
+                a_free
+                    .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::var("r")))]), // @Evan: I believe the substitution here is required to introduce the variable "r"
                 b_free,
             ]),
             ab_complex
-                .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::app("r", [])))]),
+                .subst(&mut vec![(name("iota_Res"), MorTm::app("iota_Res", MorTm::var("r")))]),
         ), // TODO: Enable formulation of rules that is agnostic of whether B has paralogs or not.
         ModelDecl::rule(
             "phosphorylate",
@@ -368,14 +371,14 @@ fn model_decls_species_granularity() -> [ModelDecl; 3] {
             PatTm::tensor([
                 a_unphos.subst(&mut vec![(
                     name("iota_SiteB"),
-                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                    MorTm::app("iota_SiteB", MorTm::var("s")),
                 )]),
                 k.clone(),
             ]), // @Evan: what do you think of the requirement to clone here?
             PatTm::tensor([
                 a_phos.subst(&mut vec![(
                     name("iota_SiteB"),
-                    MorTm::app("iota_SiteB", MorTm::app("s", [])),
+                    MorTm::app("iota_SiteB", MorTm::var("s")),
                 )]),
                 k,
             ]),
@@ -385,6 +388,7 @@ fn model_decls_species_granularity() -> [ModelDecl; 3] {
 
 #[cfg(test)]
 fn model_decls_emergent_agent() -> [ModelDecl; 5] {
+    use super::surface::*;
     let ab = PatTm::let_(
         [ObTm::var("ab"), ObTm::var("ba")],
         MorTm::app("bond", []),
@@ -455,39 +459,32 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
 
 #[cfg(test)]
 fn model_decls_directionality() -> [ModelDecl; 5] {
+    use super::surface::*;
     let abc = PatTm::let_(
-        [ObTm::var("ac"), ObTm::var("ca")],
-        MorTm::app("bond_Ch", []),
+        [ObTm::var("ac"), ObTm::var("bc"), ObTm::var("cab")],
+        MorTm::app("bond", []),
         PatTm::let_(
-            [ObTm::var("bc"), ObTm::var("cb")],
-            MorTm::app("bond_Ct", []),
-            PatTm::let_(
-                [ObTm::var("ab"), ObTm::var("ba")],
-                MorTm::app("bond_AB", []),
-                PatTm::tensor([
-                    PatTm::res("A", [MorTm::var("id_head"), MorTm::var("ac"), MorTm::var("ab")]),
-                    PatTm::res("B", [MorTm::var("ba"), MorTm::var("bc"), MorTm::var("id_tail")]),
-                    PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")]),
-                ]),
-            ),
+            [ObTm::var("ab"), ObTm::var("ba")],
+            MorTm::app("bond_AB", []),
+            PatTm::tensor([
+                PatTm::res("A", [MorTm::var("id_head"), MorTm::var("ac"), MorTm::var("ab")]),
+                PatTm::res("B", [MorTm::var("ba"), MorTm::var("bc"), MorTm::var("id_tail")]),
+                PatTm::res("C", [MorTm::var("cab")]),
+            ]),
         ),
     );
     [
         ModelDecl::agent(
             "A",
             [ObTm::var("ah"), ObTm::var("ac"), ObTm::var("at")],
-            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("tail")],
+            [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("tail_A")],
         ),
         ModelDecl::agent(
             "B",
             [ObTm::var("bh"), ObTm::var("bc"), ObTm::var("bt")],
-            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("tail")],
+            [Ty::sort("head_B"), Ty::sort("Site_CB"), Ty::sort("tail_B")],
         ),
-        ModelDecl::agent(
-            "C",
-            [ObTm::var("ch"), ObTm::var("ct")],
-            [Ty::sort("Site_ABh"), Ty::sort("Site_ABt")],
-        ),
+        ModelDecl::agent("C", [ObTm::var("c")], [Ty::sort("Site_AB")]),
         ModelDecl::rule(
             "R_AtoB_dimerization",
             [
@@ -496,7 +493,7 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
                 ObTm::var("id_Site_C2"),
                 ObTm::var("id_tail"),
             ],
-            [Ty::sort("head"), Ty::sort("Site_C"), Ty::sort("Site_C"), Ty::sort("tail")],
+            [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("Site_CB"), Ty::sort("tail_A")],
             PatTm::tensor([
                 PatTm::res(
                     "A",
@@ -525,23 +522,23 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
         ModelDecl::rule(
             "R_trimerization",
             [ObTm::var("id_head"), ObTm::var("id_tail")],
-            [Ty::sort("head"), Ty::sort("tail")],
+            [Ty::sort("head_A"), Ty::sort("tail_B")],
             PatTm::tensor([
                 PatTm::let_(
                     [ObTm::var("s1"), ObTm::var("s2")],
-                    MorTm::app("bond", []),
+                    MorTm::app("bond_AB", []),
                     PatTm::tensor([
                         PatTm::res(
                             "A",
-                            [MorTm::var("id_head"), MorTm::var("e_C"), MorTm::var("s1")],
+                            [MorTm::var("id_head"), MorTm::var("e_Ca"), MorTm::var("s1")],
                         ),
                         PatTm::res(
                             "B",
-                            [MorTm::var("s2"), MorTm::var("e_C"), MorTm::var("id_tail")],
+                            [MorTm::var("s2"), MorTm::var("e_Cb"), MorTm::var("id_tail")],
                         ),
                     ]),
                 ),
-                PatTm::res("C", [MorTm::var("e_Ch"), MorTm::var("e_Ct")]),
+                PatTm::res("C", [MorTm::var("e_AB")]),
             ]),
             abc,
         ),
@@ -550,6 +547,7 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
 
 #[cfg(test)]
 fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
+    use super::surface::*;
     [
         ModelDecl::agent("A", [ObTm::var("x")], [Ty::sort("SH2")]),
         ModelDecl::agent("C", [ObTm::var("y")], [Ty::sort("Tyr")]),
@@ -557,8 +555,8 @@ fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
             "R_phosphorylation",
             [],
             [],
-            PatTm::res("A", [MorTm::app("u", MorTm::app("e_xtyr", []))]),
-            PatTm::res("A", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+            PatTm::res("A", [MorTm::app("u", MorTm::var("e_xtyr"))]),
+            PatTm::res("A", [MorTm::app("p", MorTm::var("e_xtyr"))]),
         ),
         ModelDecl::rule(
             "R_dimerization",
@@ -566,14 +564,14 @@ fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
             [],
             PatTm::tensor([
                 PatTm::res("A", [MorTm::var("e_sh2")]),
-                PatTm::res("C", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+                PatTm::res("C", [MorTm::app("p", MorTm::var("e_xtyr"))]),
             ]),
             PatTm::let_(
                 [ObTm::var("s1"), ObTm::var("s2")],
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("s1")]),
-                    PatTm::res("C", [MorTm::app("p", [MorTm::var("s2")])]),
+                    PatTm::res("C", [MorTm::app("p", MorTm::var("s2"))]),
                 ]),
             ),
         ),
@@ -669,18 +667,18 @@ mod tests {
             [b, r] : [ReB, Res] ⊢
               bondAB [b, r]
                 : (
-                  (M iota_A, M iota_SiteB empty [], M iota_Res r []),
-                  (M iota_B b [], M iota_SiteA empty [])
+                  (M [iota_A], M [iota_SiteB empty []], M [iota_Res r]),
+                  (M [iota_B b []], M [iota_SiteA empty []])
                 )
-                → let [s1, s2] = bond [] in
+                → let bond [] in
                   (
-                    (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
-                    (M iota_B b [], M iota_SiteA s1 [])
+                    (M [iota_A], M [iota_SiteB 0.1], M [iota_Res r]),
+                    (M [iota_B b []], M [iota_SiteA 0.0])
                   )
             [s] : [SiteB] ⊢
               phosphorylate [s]
-                : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
-                → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+                : ((M [iota_A], M [iota_SiteB s], M [iota_Res unphos []]), (M [iota_K]))
+                → ((M [iota_A], M [iota_SiteB s], M [iota_Res phos []]), (M [iota_K]))
         "#]];
         expected.assert_eq(&toy_model_species_granularity_1().to_string());
 
@@ -719,18 +717,18 @@ mod tests {
             [b, r] : [ReB, Res] ⊢
               bondAB [b, r]
                 : (
-                  (M iota_A, M iota_SiteB empty [], M iota_Res r []),
-                  (M iota_B b [], M iota_SiteA empty [])
+                  (M [iota_A], M [iota_SiteB empty []], M [iota_Res r]),
+                  (M [iota_B b []], M [iota_SiteA empty []])
                 )
-                → let [s1, s2] = bond [] in
+                → let bond [] in
                   (
-                    (M iota_A, M iota_SiteB s2 [], M iota_Res r []),
-                    (M iota_B b [], M iota_SiteA s1 [])
+                    (M [iota_A], M [iota_SiteB 0.1], M [iota_Res r]),
+                    (M [iota_B b []], M [iota_SiteA 0.0])
                   )
             [s] : [SiteB] ⊢
               phosphorylate [s]
-                : ((M iota_A, M iota_SiteB s [], M iota_Res unphos []), (M iota_K))
-                → ((M iota_A, M iota_SiteB s [], M iota_Res phos []), (M iota_K))
+                : ((M [iota_A], M [iota_SiteB s], M [iota_Res unphos []]), (M [iota_K]))
+                → ((M [iota_A], M [iota_SiteB s], M [iota_Res phos []]), (M [iota_K]))
         "#]];
         expected.assert_eq(&toy_model_species_granularity_2().to_string());
 
@@ -755,53 +753,58 @@ mod tests {
             [ca, cb] : [SiteC, SiteC] ⊢
               R_dimerization [ca, cb]
                 : (A [e_B], B [e_A])
-                → let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C])
+                → let bond [] in (A [0.0, e_C], B [0.1, e_C])
             [] : [] ⊢
               R_trimerization []
-                : (let [s1, s2] = bond [] in (A [s1, e_C], B [s2, e_C]), C [e_AB, e_AB])
-                → let [bc, cb] = bond [] in
-                  let [ac, ca] = bond [] in
-                    (let [ab, ba] = bond [] in (A [ab, c], B [ba, c]), C [ca, cb])
+                : (let bond [] in (A [0.0, e_C], B [0.1, e_C]), C [e_AB, e_AB])
+                → let bond [] in
+                  let bond [] in (let bond [] in (A [0.0, c], B [0.1, c]), C [0.1, 1.1])
         "#]]; // TODO: fix unbound variables in nested let statement
         expected.assert_eq(&toy_model_emergent_agent().to_string());
 
         let expected = expect![[r#"
             #/ sorts:
-            head
-            tail
-            Site_C
-            Site_ABh
-            Site_ABt
+            head_A
+            head_B
+            tail_A
+            tail_B
+            Site_CA
+            Site_CB
+            Site_AB
             #/ operations:
-            e_h : [] → head
-            e_t : [] → tail
-            e_C : [] → Site_C
-            e_ABh : [] → Site_ABh
-            e_ABt : [] → Site_ABt
-            bond_AB : [] → ⊗ [head, tail]
-            bond_Ch : [] → ⊗ [Site_ABh, Site_C]
-            bond_Ct : [] → ⊗ [Site_ABt, Site_C]
+            e_ha : [] → head_A
+            e_hb : [] → head_B
+            e_ta : [] → tail_A
+            e_tb : [] → tail_B
+            e_Ca : [] → Site_CA
+            e_Cb : [] → Site_CB
+            e_AB : [] → Site_AB
+            bond_AB : [] → ⊗ [tail_A, head_B]
+            bond : [] → ⊗ [Site_AB, ⊗ [Site_CA, Site_CB]]
             #/ agents:
-            [ah, ac, at] : [head, Site_C, tail] ⊢ A [ah, ac, at]
-            [bh, bc, bt] : [head, Site_C, tail] ⊢ B [bh, bc, bt]
-            [ch, ct] : [Site_ABh, Site_ABt] ⊢ C [ch, ct]
+            [ah, ac, at] : [head_A, Site_CA, tail_A] ⊢ A [ah, ac, at]
+            [bh, bc, bt] : [head_B, Site_CB, tail_B] ⊢ B [bh, bc, bt]
+            [c] : [Site_AB] ⊢ C [c]
             #/ rules:
-            [id_head, id_Site_C1, id_Site_C2, id_tail] : [head, Site_C, Site_C, tail] ⊢
+            [id_head, id_Site_C1, id_Site_C2, id_tail] : [
+              head_A,
+              Site_CA,
+              Site_CB,
+              tail_A
+            ] ⊢
               R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
                 : (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
-                → let [s1, s2] = bond_AB [] in
-                  (A [id_head, id_Site_C1, s1], B [s2, id_Site_C2, id_tail])
-            [id_head, id_tail] : [head, tail] ⊢
+                → let bond_AB [] in
+                  (A [id_head, id_Site_C1, 0.0], B [0.1, id_Site_C2, id_tail])
+            [id_head, id_tail] : [head_A, tail_B] ⊢
               R_trimerization [id_head, id_tail]
                 : (
-                  let [s1, s2] = bond [] in (A [id_head, e_C, s1], B [s2, e_C, id_tail]),
-                  C [e_Ch, e_Ct]
+                  let bond_AB [] in (A [id_head, e_Ca, 0.0], B [0.1, e_Cb, id_tail]),
+                  C [e_AB]
                 )
-                → let [ac, ca] = bond_Ch [] in
-                  let [bc, cb] = bond_Ct [] in
-                    let [ab, ba] = bond_AB [] in
-                      (A [id_head, ac, ab], B [ba, bc, id_tail], C [ca, cb])
-        "#]]; // TODO: fix unbound variables in nested let statement
+                → let bond [] in
+                  let bond_AB [] in (A [id_head, 1.0, 0.0], B [0.1, 1.1, id_tail], C [1.2])
+        "#]];
         expected.assert_eq(&toy_model_directionality().to_string());
 
         let expected = expect![[r#"
@@ -819,11 +822,11 @@ mod tests {
             [x] : [SH2] ⊢ A [x]
             [y] : [Tyr] ⊢ C [y]
             #/ rules:
-            [] : [] ⊢ R_phosphorylation [] : A [u e_xtyr []] → A [p e_xtyr []]
+            [] : [] ⊢ R_phosphorylation [] : A [u e_xtyr] → A [p e_xtyr]
             [] : [] ⊢
               R_dimerization []
-                : (A [e_sh2], C [p e_xtyr []])
-                → let [s1, s2] = bond [] in (A [s1], C [p [s2]])
+                : (A [e_sh2], C [p e_xtyr])
+                → let bond [] in (A [0.0], C [p 0.1])
         "#]];
         expected.assert_eq(&toy_model_phospho_tyrosine().to_string());
     }
