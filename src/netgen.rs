@@ -658,73 +658,18 @@ mod tests {
         let generator = NetGenerator::new(&model);
 
         let species = expect![[r#"
-            A [e_B [], e_C []]
-            B [e_A [], e_C []]
-            C [e_AB [], e_AB []]
-            let bond_AB [] in (A [0.1, e_C []], B [0.0, e_C []])
-            let bond_C [] in (A [e_B [], 0.1], C [e_AB [], 0.0])
-            let bond_C [] in (A [e_B [], 0.1], C [0.0, e_AB []])
-            let bond_C [] in (B [e_A [], 0.1], C [e_AB [], 0.0])
-            let bond_C [] in (B [e_A [], 0.1], C [0.0, e_AB []])
-            let bond_C [] in
-              let bond_C [] in (A [e_B [], 0.1], A [e_B [], 1.1], C [0.0, 1.0])
-            let bond_C [] in
-              let bond_C [] in (A [e_B [], 1.1], A [e_B [], 0.1], C [0.0, 1.0])
-            let bond_C [] in
-              let bond_C [] in (A [e_B [], 0.1], B [e_A [], 1.1], C [0.0, 1.0])
-            let bond_C [] in
-              let bond_C [] in (A [e_B [], 1.1], B [e_A [], 0.1], C [0.0, 1.0])
-            let bond_C [] in
-              let bond_AB [] in (A [0.1, e_C []], B [0.0, 1.1], C [e_AB [], 1.0])
-            let bond_C [] in
-              let bond_AB [] in (A [0.1, e_C []], B [0.0, 1.1], C [1.0, e_AB []])
-            let bond_C [] in
-              let bond_AB [] in (A [0.1, 1.1], B [0.0, e_C []], C [e_AB [], 1.0])
-            let bond_C [] in
-              let bond_AB [] in (A [0.1, 1.1], B [0.0, e_C []], C [1.0, e_AB []])
-            let bond_C [] in
-              let bond_C [] in let bond_AB [] in (A [0.1, 1.1], B [0.0, 2.1], C [1.0, 2.0])
-            let bond_C [] in
-              let bond_C [] in let bond_AB [] in (A [0.1, 2.1], B [0.0, 1.1], C [1.0, 2.0])
-            let bond_C [] in
-              let bond_C [] in (B [e_A [], 0.1], B [e_A [], 1.1], C [0.0, 1.0])
-            let bond_C [] in
-              let bond_C [] in (B [e_A [], 1.1], B [e_A [], 0.1], C [0.0, 1.0])"#]];
+            A [e_B []]
+            B [e_A []]
+            C [e_AB []]
+            let bond_AB [e_AB []] in (A [0.1], B [0.0])"#]];
         species.assert_eq(&generator.species(3).join("\n"));
 
         let transitions = expect![[r#"
-            R_dimerization [e_C [], e_C []]
-              : (A [e_B], B [e_A])
-              → let bond [] in (A [0.0, e_C], B [0.1, e_C])
+            R_dimerization [] : (A [e_B], B [e_A]) → let bond_AB in (A [0.0], B [0.1])
             R_trimerization []
-              : (let bond [] in (A [0.0, e_C], B [0.1, e_C]), C [e_AB, e_AB])
-              → let bond [] in
-                let bond [] in (let bond [] in (A [0.0, c], B [0.1, c]), C [0.1, 1.1])
-            let bond_C [] in (C [e_AB [], 0.0], R_dimerization [e_C [], 0.1])
-              : let bond_C [] in (C [e_AB [], 0.0], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                (C [e_AB [], 0.0], let bond [] in (A [0.0, e_C], B [0.1, e_C]))
-            let bond_C [] in (C [e_AB [], 0.0], R_dimerization [0.1, e_C []])
-              : let bond_C [] in (C [e_AB [], 0.0], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                (C [e_AB [], 0.0], let bond [] in (A [0.0, e_C], B [0.1, e_C]))
-            let bond_C [] in (C [0.0, e_AB []], R_dimerization [e_C [], 0.1])
-              : let bond_C [] in (C [0.0, e_AB []], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                (C [0.0, e_AB []], let bond [] in (A [0.0, e_C], B [0.1, e_C]))
-            let bond_C [] in (C [0.0, e_AB []], R_dimerization [0.1, e_C []])
-              : let bond_C [] in (C [0.0, e_AB []], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                (C [0.0, e_AB []], let bond [] in (A [0.0, e_C], B [0.1, e_C]))
-            let bond_C [] in let bond_C [] in (C [0.0, 1.0], R_dimerization [0.1, 1.1])
-              : let bond_C [] in let bond_C [] in (C [0.0, 1.0], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                let bond_C [] in (C [0.0, 1.0], let bond [] in (A [0.0, e_C], B [0.1, e_C]))
-            let bond_C [] in let bond_C [] in (C [1.0, 0.0], R_dimerization [0.1, 1.1])
-              : let bond_C [] in let bond_C [] in (C [1.0, 0.0], (A [e_B], B [e_A]))
-              → let bond_C [] in
-                let bond_C [] in (C [1.0, 0.0], let bond [] in (A [0.0, e_C], B [0.1, e_C]))"#]];
-        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
+              : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
+              → let bond_C [] in (let bond_AB in (A [0.0], B [0.1]), C [])"#]];
+        transitions.assert_eq(&generator.transitions(3).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
     }
 
     // TODO: Try to rewrite this model without generating unexpected species.
@@ -743,78 +688,20 @@ mod tests {
         // C [1.0]
         // )
         let species = expect![[r#"
-            A [e_ha [], e_Ca [], e_ta []]
-            B [e_hb [], e_Cb [], e_tb []]
-            C [e_AB []]
-            let bond_AB [] in (A [e_ha [], e_Ca [], 0.0], B [0.1, e_Cb [], e_tb []])
-            let bond [] in (A [e_ha [], 0.1, e_ta []], B [e_hb [], 0.2, e_tb []], C [0.0])
-            let bond [] in
-              let bond_AB [] in (A [e_ha [], 1.1, 0.0], B [0.1, 1.2, e_tb []], C [1.0])
-            let bond [] in
-              let bond_AB [] in
-                (
-                  A [e_ha [], e_Ca [], 0.0],
-                  A [e_ha [], 1.1, e_ta []],
-                  B [0.1, 1.2, e_tb []],
-                  C [1.0]
-                )
-            let bond [] in
-              let bond_AB [] in
-                (
-                  A [e_ha [], 1.1, e_ta []],
-                  A [e_ha [], e_Ca [], 0.0],
-                  B [0.1, 1.2, e_tb []],
-                  C [1.0]
-                )
-            let bond [] in
-              let bond_AB [] in
-                (
-                  A [e_ha [], 1.1, 0.0],
-                  B [e_hb [], 1.2, e_tb []],
-                  B [0.1, e_Cb [], e_tb []],
-                  C [1.0]
-                )
-            let bond [] in
-              let bond_AB [] in
-                (
-                  A [e_ha [], 1.1, 0.0],
-                  B [0.1, e_Cb [], e_tb []],
-                  B [e_hb [], 1.2, e_tb []],
-                  C [1.0]
-                )"#]];
-        species.assert_eq(&generator.species(4).join("\n")); // Note that this model allows infinite polymerization
+            A [e_ha [], e_ta []]
+            B [e_hb [], e_tb []]
+            C [e_Ch [], e_Ct []]
+            let bond_AB [e_Ch [], e_Ct []] in (A [e_ha [], 0.0], B [0.1, e_tb []])"#]];
+        species.assert_eq(&generator.species(4).join("\n"));
 
         let transitions = expect![[r#"
-            R_AtoB_dimerization [e_ha [], e_Ca [], e_Cb [], e_ta []]
-              : (A [e_ha [], e_Ca [], e_t], B [e_h, e_Cb [], e_ta []])
-              → let bond_AB [] in (A [e_ha [], e_Ca [], 0.0], B [0.1, e_Cb [], e_ta []])
-            R_trimerization [e_ha [], e_tb []]
-              : (
-                let bond_AB [] in (A [e_ha [], e_Ca, 0.0], B [0.1, e_Cb, e_tb []]),
-                C [e_AB]
-              )
-              → let bond [] in
-                let bond_AB [] in (A [e_ha [], 1.0, 0.0], B [0.1, 1.1, e_tb []], C [1.2])
-            let bond_AB [] in
-                (
-                  B [0.1, e_Cb [], e_tb []],
-                  R_AtoB_dimerization [e_ha [], e_Ca [], e_Cb [], 0.0]
-                )
-              : let bond_AB [] in
-                (
-                  B [0.1, e_Cb [], e_tb []],
-                  (A [e_ha [], e_Ca [], e_t], B [e_h, e_Cb [], 0.0])
-                )
-              → let bond_AB [] in
-                (
-                  B [0.1, e_Cb [], e_tb []],
-                  let bond_AB [] in (A [e_ha [], e_Ca [], 0.0], B [0.1, e_Cb [], 1.0])
-                )
-            let bond [] in (C [0.0], R_AtoB_dimerization [e_ha [], 0.1, 0.2, e_ta []])
-              : let bond [] in (C [0.0], (A [e_ha [], 0.1, e_t], B [e_h, 0.2, e_ta []]))
-              → let bond [] in
-                (C [0.0], let bond_AB [] in (A [e_ha [], 1.1, 0.0], B [0.1, 1.2, e_ta []]))"#]];
-        transitions.assert_eq(&generator.transitions(2).join("\n")); // TODO: consider stronger typing to avoid explosion of transitions
+            R_dimerization [e_ha [], e_tb []]
+              : (A [e_B], B [e_A])
+              → let bond_AB in (A [0.0], B [0.1])
+            R_trimerization []
+              : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
+              → let bond_C [] in (let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]), C [0.2])"#]];
+        transitions.assert_eq(&generator.transitions(2).join("\n")); // @Evan, is it expected that this RHS does not appear in the species?
     }
 
     #[test]

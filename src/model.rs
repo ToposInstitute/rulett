@@ -391,67 +391,33 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
     use super::surface::*;
     let ab = PatTm::let_(
         [ObTm::var("ab"), ObTm::var("ba")],
-        MorTm::app("bond", []),
-        PatTm::tensor([
-            PatTm::res("A", [MorTm::var("ab"), MorTm::var("c")]),
-            PatTm::res("B", [MorTm::var("ba"), MorTm::var("c")]),
-        ]),
+        MorTm::var("bond_AB"),
+        PatTm::tensor([PatTm::res("A", [MorTm::var("ab")]), PatTm::res("B", [MorTm::var("ba")])]),
     );
-    let abc_incomplete = PatTm::let_(
-        [ObTm::var("ac"), ObTm::var("ca")],
-        MorTm::app("bond", []),
-        PatTm::tensor([ab, PatTm::res("C", [MorTm::var("ca"), MorTm::var("cb")])]),
+    let abc = PatTm::let_(
+        [ObTm::var("abc"), ObTm::var("cab")],
+        MorTm::app("bond_C", []),
+        PatTm::tensor([ab.clone(), PatTm::res("C", [])]),
     );
-    let abc =
-        PatTm::let_([ObTm::var("bc"), ObTm::var("cb")], MorTm::app("bond", []), abc_incomplete);
     [
-        ModelDecl::agent(
-            "A",
-            [ObTm::var("ab"), ObTm::var("ac")],
-            [Ty::sort("SiteB"), Ty::sort("SiteC")],
-        ),
-        ModelDecl::agent(
-            "B",
-            [ObTm::var("ba"), ObTm::var("bc")],
-            [Ty::sort("SiteA"), Ty::sort("SiteC")],
-        ),
-        ModelDecl::agent(
-            "C",
-            [ObTm::var("ca"), ObTm::var("cb")],
-            [Ty::sort("SiteAB"), Ty::sort("SiteAB")],
-        ),
+        ModelDecl::agent("A", [ObTm::var("ab")], [Ty::sort("SiteB")]),
+        ModelDecl::agent("B", [ObTm::var("ba")], [Ty::sort("SiteA")]),
+        ModelDecl::agent("C", [ObTm::var("cab")], [Ty::sort("SiteAB")]),
         ModelDecl::rule(
             "R_dimerization",
-            [ObTm::var("ca"), ObTm::var("cb")],
-            [Ty::sort("SiteC"), Ty::sort("SiteC")],
+            [],
+            [],
             PatTm::tensor([
                 PatTm::res("A", [MorTm::var("e_B")]),
                 PatTm::res("B", [MorTm::var("e_A")]),
             ]),
-            PatTm::let_(
-                [ObTm::var("s1"), ObTm::var("s2")], // TODO: harmonize variable naming convention
-                MorTm::app("bond", []),
-                PatTm::tensor([
-                    PatTm::res("A", [MorTm::var("s1"), MorTm::var("e_C")]),
-                    PatTm::res("B", [MorTm::var("s2"), MorTm::var("e_C")]),
-                ]),
-            ),
+            ab.clone(),
         ),
         ModelDecl::rule(
             "R_trimerization",
             [],
             [],
-            PatTm::tensor([
-                PatTm::let_(
-                    [ObTm::var("s1"), ObTm::var("s2")],
-                    MorTm::app("bond", []),
-                    PatTm::tensor([
-                        PatTm::res("A", [MorTm::var("s1"), MorTm::var("e_C")]),
-                        PatTm::res("B", [MorTm::var("s2"), MorTm::var("e_C")]),
-                    ]),
-                ),
-                PatTm::res("C", [MorTm::var("e_AB"), MorTm::var("e_AB")]),
-            ]),
+            PatTm::tensor([ab, PatTm::res("C", [MorTm::var("e_AB")])]),
             abc,
         ),
     ]
@@ -460,91 +426,152 @@ fn model_decls_emergent_agent() -> [ModelDecl; 5] {
 #[cfg(test)]
 fn model_decls_directionality() -> [ModelDecl; 5] {
     use super::surface::*;
+    let ab = PatTm::let_(
+        [ObTm::var("ab"), ObTm::var("ba")],
+        MorTm::var("bond_AB"),
+        PatTm::tensor([PatTm::res("A", [MorTm::var("ab")]), PatTm::res("B", [MorTm::var("ba")])]),
+    );
+
     let abc = PatTm::let_(
         [ObTm::var("ac"), ObTm::var("bc"), ObTm::var("cab")],
-        MorTm::app("bond", []),
-        PatTm::let_(
-            [ObTm::var("ab"), ObTm::var("ba")],
-            MorTm::app("bond_AB", []),
-            PatTm::tensor([
-                PatTm::res("A", [MorTm::var("id_head"), MorTm::var("ac"), MorTm::var("ab")]),
-                PatTm::res("B", [MorTm::var("ba"), MorTm::var("bc"), MorTm::var("id_tail")]),
-                PatTm::res("C", [MorTm::var("cab")]),
-            ]),
-        ),
+        MorTm::app("bond_C", []),
+        PatTm::tensor([
+            ab.clone().subst(&mut vec![(
+                name("bond_AB"),
+                MorTm::app("bond_AB", MorTm::tensor([MorTm::var("ac"), MorTm::var("bc")])),
+            )]), // TODO: ask Evan how to do this
+            PatTm::res("C", [MorTm::var("cab")]),
+        ]),
     );
+
+    // let abc = PatTm::let_(
+    // [ObTm::var("abc"), ObTm::var("cab")],
+    // MorTm::app("bond_C", []),
+    // PatTm::tensor([ab.clone(), PatTm::res("C", [MorTm::var("cab")])]),
+    // );
     [
         ModelDecl::agent(
             "A",
-            [ObTm::var("ah"), ObTm::var("ac"), ObTm::var("at")],
-            [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("tail_A")],
+            [ObTm::var("head_a"), ObTm::var("tail_a")],
+            [Ty::sort("head_A"), Ty::sort("tail_A")],
         ),
         ModelDecl::agent(
             "B",
-            [ObTm::var("bh"), ObTm::var("bc"), ObTm::var("bt")],
-            [Ty::sort("head_B"), Ty::sort("Site_CB"), Ty::sort("tail_B")],
+            [ObTm::var("head_b"), ObTm::var("tail_b")],
+            [Ty::sort("head_B"), Ty::sort("tail_B")],
         ),
-        ModelDecl::agent("C", [ObTm::var("c")], [Ty::sort("Site_AB")]),
+        ModelDecl::agent(
+            "C",
+            [ObTm::var("ch"), ObTm::var("ct")],
+            [Ty::sort("Site_Ch"), Ty::sort("Site_Ct")],
+        ),
         ModelDecl::rule(
-            "R_AtoB_dimerization",
-            [
-                ObTm::var("id_head"),
-                ObTm::var("id_Site_C1"),
-                ObTm::var("id_Site_C2"),
-                ObTm::var("id_tail"),
-            ],
-            [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("Site_CB"), Ty::sort("tail_A")],
+            "R_dimerization",
+            [ObTm::var("id_head_A"), ObTm::var("id_tail_B")],
+            [Ty::sort("head_A"), Ty::sort("tail_B")],
             PatTm::tensor([
-                PatTm::res(
-                    "A",
-                    [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("e_t")],
-                ),
-                PatTm::res(
-                    "B",
-                    [MorTm::var("e_h"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
-                ),
+                PatTm::res("A", [MorTm::var("e_B")]),
+                PatTm::res("B", [MorTm::var("e_A")]),
             ]),
-            PatTm::let_(
-                [ObTm::var("s1"), ObTm::var("s2")], // TODO: harmonize variable naming convention
-                MorTm::app("bond_AB", []),
-                PatTm::tensor([
-                    PatTm::res(
-                        "A",
-                        [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("s1")],
-                    ),
-                    PatTm::res(
-                        "B",
-                        [MorTm::var("s2"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
-                    ),
-                ]),
-            ),
+            ab.clone(),
         ),
         ModelDecl::rule(
             "R_trimerization",
-            [ObTm::var("id_head"), ObTm::var("id_tail")],
-            [Ty::sort("head_A"), Ty::sort("tail_B")],
-            PatTm::tensor([
-                PatTm::let_(
-                    [ObTm::var("s1"), ObTm::var("s2")],
-                    MorTm::app("bond_AB", []),
-                    PatTm::tensor([
-                        PatTm::res(
-                            "A",
-                            [MorTm::var("id_head"), MorTm::var("e_Ca"), MorTm::var("s1")],
-                        ),
-                        PatTm::res(
-                            "B",
-                            [MorTm::var("s2"), MorTm::var("e_Cb"), MorTm::var("id_tail")],
-                        ),
-                    ]),
-                ),
-                PatTm::res("C", [MorTm::var("e_AB")]),
-            ]),
+            [],
+            [],
+            PatTm::tensor([ab, PatTm::res("C", [MorTm::var("e_AB")])]),
             abc,
         ),
     ]
-} // This is not polymerization, cause there is no B to A dimerization.
+}
 
+#[cfg(test)]
+// fn model_decls_directionality() -> [ModelDecl; 5] {
+// use super::surface::*;
+// let abc = PatTm::let_(
+// [ObTm::var("ac"), ObTm::var("bc"), ObTm::var("cab")],
+// MorTm::app("bond", []),
+// PatTm::let_(
+// [ObTm::var("ab"), ObTm::var("ba")],
+// MorTm::app("bond_AB", []),
+// PatTm::tensor([
+// PatTm::res("A", [MorTm::var("id_head"), MorTm::var("ac"), MorTm::var("ab")]),
+// PatTm::res("B", [MorTm::var("ba"), MorTm::var("bc"), MorTm::var("id_tail")]),
+// PatTm::res("C", [MorTm::var("cab")]),
+// ]),
+// ),
+// );
+// [
+// ModelDecl::agent(
+// "A",
+// [ObTm::var("ah"), ObTm::var("ac"), ObTm::var("at")],
+// [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("tail_A")],
+// ),
+// ModelDecl::agent(
+// "B",
+// [ObTm::var("bh"), ObTm::var("bc"), ObTm::var("bt")],
+// [Ty::sort("head_B"), Ty::sort("Site_CB"), Ty::sort("tail_B")],
+// ),
+// ModelDecl::agent("C", [ObTm::var("c")], [Ty::sort("Site_AB")]),
+// ModelDecl::rule(
+// "R_AtoB_dimerization",
+// [
+// ObTm::var("id_head"),
+// ObTm::var("id_Site_C1"),
+// ObTm::var("id_Site_C2"),
+// ObTm::var("id_tail"),
+// ],
+// [Ty::sort("head_A"), Ty::sort("Site_CA"), Ty::sort("Site_CB"), Ty::sort("tail_A")],
+// PatTm::tensor([
+// PatTm::res(
+// "A",
+// [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("e_t")],
+// ),
+// PatTm::res(
+// "B",
+// [MorTm::var("e_h"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
+// ),
+// ]),
+// PatTm::let_(
+// [ObTm::var("s1"), ObTm::var("s2")], // TODO: harmonize variable naming convention
+// MorTm::app("bond_AB", []),
+// PatTm::tensor([
+// PatTm::res(
+// "A",
+// [MorTm::var("id_head"), MorTm::var("id_Site_C1"), MorTm::var("s1")],
+// ),
+// PatTm::res(
+// "B",
+// [MorTm::var("s2"), MorTm::var("id_Site_C2"), MorTm::var("id_tail")],
+// ),
+// ]),
+// ),
+// ),
+// ModelDecl::rule(
+// "R_trimerization",
+// [ObTm::var("id_head"), ObTm::var("id_tail")],
+// [Ty::sort("head_A"), Ty::sort("tail_B")],
+// PatTm::tensor([
+// PatTm::let_(
+// [ObTm::var("s1"), ObTm::var("s2")],
+// MorTm::app("bond_AB", []),
+// PatTm::tensor([
+// PatTm::res(
+// "A",
+// [MorTm::var("id_head"), MorTm::var("e_Ca"), MorTm::var("s1")],
+// ),
+// PatTm::res(
+// "B",
+// [MorTm::var("s2"), MorTm::var("e_Cb"), MorTm::var("id_tail")],
+// ),
+// ]),
+// ),
+// PatTm::res("C", [MorTm::var("e_AB")]),
+// ]),
+// abc,
+// ),
+// ]
+// } // This is not polymerization, cause there is no B to A dimerization.
 #[cfg(test)]
 fn model_decls_phospho_tyrosine() -> [ModelDecl; 4] {
     use super::surface::*;
@@ -743,22 +770,19 @@ mod tests {
             e_B : [] → SiteB
             e_C : [] → SiteC
             e_AB : [] → SiteAB
-            bond_AB : [] → ⊗ [SiteA, SiteB]
+            bond_AB : [SiteAB] → ⊗ [SiteA, SiteB]
             bond_C : [] → ⊗ [SiteAB, SiteC]
             #/ agents:
-            [ab, ac] : [SiteB, SiteC] ⊢ A [ab, ac]
-            [ba, bc] : [SiteA, SiteC] ⊢ B [ba, bc]
-            [ca, cb] : [SiteAB, SiteAB] ⊢ C [ca, cb]
+            [ab] : [SiteB] ⊢ A [ab]
+            [ba] : [SiteA] ⊢ B [ba]
+            [cab] : [SiteAB] ⊢ C [cab]
             #/ rules:
-            [ca, cb] : [SiteC, SiteC] ⊢
-              R_dimerization [ca, cb]
-                : (A [e_B], B [e_A])
-                → let bond [] in (A [0.0, e_C], B [0.1, e_C])
+            [] : [] ⊢
+              R_dimerization [] : (A [e_B], B [e_A]) → let bond_AB in (A [0.0], B [0.1])
             [] : [] ⊢
               R_trimerization []
-                : (let bond [] in (A [0.0, e_C], B [0.1, e_C]), C [e_AB, e_AB])
-                → let bond [] in
-                  let bond [] in (let bond [] in (A [0.0, c], B [0.1, c]), C [0.1, 1.1])
+                : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
+                → let bond_C [] in (let bond_AB in (A [0.0], B [0.1]), C [])
         "#]]; // TODO: fix unbound variables in nested let statement
         expected.assert_eq(&toy_model_emergent_agent().to_string());
 
@@ -768,42 +792,32 @@ mod tests {
             head_B
             tail_A
             tail_B
-            Site_CA
-            Site_CB
+            Site_Ch
+            Site_Ct
             Site_AB
             #/ operations:
             e_ha : [] → head_A
             e_hb : [] → head_B
             e_ta : [] → tail_A
             e_tb : [] → tail_B
-            e_Ca : [] → Site_CA
-            e_Cb : [] → Site_CB
+            e_Ch : [] → Site_Ch
+            e_Ct : [] → Site_Ct
             e_AB : [] → Site_AB
-            bond_AB : [] → ⊗ [tail_A, head_B]
-            bond : [] → ⊗ [Site_AB, ⊗ [Site_CA, Site_CB]]
+            bond_AB : [Site_Ch, Site_Ct] → ⊗ [tail_A, head_B]
+            bond_C : [] → ⊗ [Site_AB, ⊗ [Site_Ch, Site_Ct]]
             #/ agents:
-            [ah, ac, at] : [head_A, Site_CA, tail_A] ⊢ A [ah, ac, at]
-            [bh, bc, bt] : [head_B, Site_CB, tail_B] ⊢ B [bh, bc, bt]
-            [c] : [Site_AB] ⊢ C [c]
+            [head_a, tail_a] : [head_A, tail_A] ⊢ A [head_a, tail_a]
+            [head_b, tail_b] : [head_B, tail_B] ⊢ B [head_b, tail_b]
+            [ch, ct] : [Site_Ch, Site_Ct] ⊢ C [ch, ct]
             #/ rules:
-            [id_head, id_Site_C1, id_Site_C2, id_tail] : [
-              head_A,
-              Site_CA,
-              Site_CB,
-              tail_A
-            ] ⊢
-              R_AtoB_dimerization [id_head, id_Site_C1, id_Site_C2, id_tail]
-                : (A [id_head, id_Site_C1, e_t], B [e_h, id_Site_C2, id_tail])
-                → let bond_AB [] in
-                  (A [id_head, id_Site_C1, 0.0], B [0.1, id_Site_C2, id_tail])
-            [id_head, id_tail] : [head_A, tail_B] ⊢
-              R_trimerization [id_head, id_tail]
-                : (
-                  let bond_AB [] in (A [id_head, e_Ca, 0.0], B [0.1, e_Cb, id_tail]),
-                  C [e_AB]
-                )
-                → let bond [] in
-                  let bond_AB [] in (A [id_head, 1.0, 0.0], B [0.1, 1.1, id_tail], C [1.2])
+            [id_head_A, id_tail_B] : [head_A, tail_B] ⊢
+              R_dimerization [id_head_A, id_tail_B]
+                : (A [e_B], B [e_A])
+                → let bond_AB in (A [0.0], B [0.1])
+            [] : [] ⊢
+              R_trimerization []
+                : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
+                → let bond_C [] in (let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]), C [0.2])
         "#]];
         expected.assert_eq(&toy_model_directionality().to_string());
 

@@ -292,7 +292,11 @@ pub(crate) fn toy_signature_emergent_agent() -> Signature {
         SignatureDecl::operation("e_B", [], Ty::sort("SiteB")),
         SignatureDecl::operation("e_C", [], Ty::sort("SiteC")),
         SignatureDecl::operation("e_AB", [], Ty::sort("SiteAB")),
-        SignatureDecl::operation("bond_AB", [], Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")])),
+        SignatureDecl::operation(
+            "bond_AB",
+            [Ty::sort("SiteAB")],
+            Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")]),
+        ),
         SignatureDecl::operation("bond_C", [], Ty::tensor([Ty::sort("SiteAB"), Ty::sort("SiteC")])),
     ])
     .unwrap()
@@ -306,39 +310,29 @@ pub(crate) fn toy_signature_directionality() -> Signature {
         SignatureDecl::sort("head_B"),
         SignatureDecl::sort("tail_A"),
         SignatureDecl::sort("tail_B"),
-        SignatureDecl::sort("Site_CA"),
-        SignatureDecl::sort("Site_CB"),
+        SignatureDecl::sort("Site_Ch"),
+        SignatureDecl::sort("Site_Ct"),
         SignatureDecl::sort("Site_AB"),
         // SignatureDecl::sort("Site_ABt"),
         SignatureDecl::operation("e_ha", [], Ty::sort("head_A")),
         SignatureDecl::operation("e_hb", [], Ty::sort("head_B")),
         SignatureDecl::operation("e_ta", [], Ty::sort("tail_A")),
         SignatureDecl::operation("e_tb", [], Ty::sort("tail_B")),
-        SignatureDecl::operation("e_Ca", [], Ty::sort("Site_CA")),
-        SignatureDecl::operation("e_Cb", [], Ty::sort("Site_CB")),
+        SignatureDecl::operation("e_Ch", [], Ty::sort("Site_Ch")),
+        SignatureDecl::operation("e_Ct", [], Ty::sort("Site_Ct")),
         SignatureDecl::operation("e_AB", [], Ty::sort("Site_AB")),
         // SignatureDecl::operation("e_ABt", [], Ty::sort("Site_ABt")),
         SignatureDecl::operation(
             "bond_AB",
-            [],
+            [Ty::sort("Site_Ch"), Ty::sort("Site_Ct")],
             Ty::tensor([Ty::sort("tail_A"), Ty::sort("head_B")]),
         ),
-        // SignatureDecl::operation(
-        // "bond_Ch",
-        // [],
-        // Ty::tensor([Ty::sort("Site_ABh"), Ty::sort("Site_CA")]),
-        // ),
-        // SignatureDecl::operation(
-        // "bond_Ct",
-        // [],
-        // Ty::tensor([Ty::sort("Site_ABt"), Ty::sort("Site_CB")]),
-        // ),
         SignatureDecl::operation(
-            "bond",
+            "bond_C",
             [],
             Ty::tensor([
                 Ty::sort("Site_AB"),
-                Ty::tensor([Ty::sort("Site_CA"), Ty::sort("Site_CB")]),
+                Ty::tensor([Ty::sort("Site_Ch"), Ty::sort("Site_Ct")]),
             ]),
         ),
     ])
@@ -468,7 +462,7 @@ mod tests {
             e_B : [] → SiteB
             e_C : [] → SiteC
             e_AB : [] → SiteAB
-            bond_AB : [] → ⊗ [SiteA, SiteB]
+            bond_AB : [SiteAB] → ⊗ [SiteA, SiteB]
             bond_C : [] → ⊗ [SiteAB, SiteC]
         "#]];
         expected.assert_eq(&toy_signature_emergent_agent().to_string());
@@ -479,19 +473,19 @@ mod tests {
             head_B
             tail_A
             tail_B
-            Site_CA
-            Site_CB
+            Site_Ch
+            Site_Ct
             Site_AB
             #/ operations:
             e_ha : [] → head_A
             e_hb : [] → head_B
             e_ta : [] → tail_A
             e_tb : [] → tail_B
-            e_Ca : [] → Site_CA
-            e_Cb : [] → Site_CB
+            e_Ca : [] → Site_Ch
+            e_Cb : [] → Site_Ct
             e_AB : [] → Site_AB
-            bond_AB : [] → ⊗ [tail_A, head_B]
-            bond : [] → ⊗ [Site_AB, ⊗ [Site_CA, Site_CB]]
+            bond_AB : [Site_Ch, Site_Ct] → ⊗ [tail_A, head_B]
+            bond_C : [] → ⊗ [Site_AB, ⊗ [Site_Ch, Site_Ct]]
         "#]];
         expected.assert_eq(&toy_signature_directionality().to_string());
 
