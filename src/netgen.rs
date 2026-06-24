@@ -699,8 +699,8 @@ mod tests {
               : (A [e_B], B [e_A])
               → let bond_AB in (A [0.0], B [0.1])
             R_trimerization []
-              : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
-              → let bond_C [] in (let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]), C [0.2])"#]];
+              : (let bond_AB (e_Ch [], e_Cb []) in (A [0.0], B [0.1]), C [e_AB])
+              → let bond_C [] in (C [0.2], let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]))"#]];
         transitions.assert_eq(&generator.transitions(2).join("\n")); // @Evan, is it expected that this RHS does not appear in the species?
     }
 

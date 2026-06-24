@@ -305,6 +305,7 @@ pub(crate) fn toy_signature_emergent_agent() -> Signature {
 /// Signature for a toy model (emergent agent with directionality).
 #[cfg(test)]
 pub(crate) fn toy_signature_directionality() -> Signature {
+    let site_c = Ty::tensor([Ty::sort("Site_Ch"), Ty::sort("Site_Ct")]);
     Signature::parse([
         SignatureDecl::sort("head_A"),
         SignatureDecl::sort("head_B"),
@@ -327,14 +328,7 @@ pub(crate) fn toy_signature_directionality() -> Signature {
             [Ty::sort("Site_Ch"), Ty::sort("Site_Ct")],
             Ty::tensor([Ty::sort("tail_A"), Ty::sort("head_B")]),
         ),
-        SignatureDecl::operation(
-            "bond_C",
-            [],
-            Ty::tensor([
-                Ty::sort("Site_AB"),
-                Ty::tensor([Ty::sort("Site_Ch"), Ty::sort("Site_Ct")]),
-            ]),
-        ),
+        SignatureDecl::operation("bond_C", [], Ty::tensor([Ty::sort("Site_AB"), site_c.clone()])),
     ])
     .unwrap()
 }
@@ -481,8 +475,8 @@ mod tests {
             e_hb : [] → head_B
             e_ta : [] → tail_A
             e_tb : [] → tail_B
-            e_Ca : [] → Site_Ch
-            e_Cb : [] → Site_Ct
+            e_Ch : [] → Site_Ch
+            e_Ct : [] → Site_Ct
             e_AB : [] → Site_AB
             bond_AB : [Site_Ch, Site_Ct] → ⊗ [tail_A, head_B]
             bond_C : [] → ⊗ [Site_AB, ⊗ [Site_Ch, Site_Ct]]

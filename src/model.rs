@@ -387,41 +387,75 @@ fn model_decls_species_granularity() -> [ModelDecl; 3] {
 }
 
 #[cfg(test)]
-fn model_decls_emergent_agent() -> [ModelDecl; 5] {
+fn model_decls_emergent_agent() -> [ModelDecl; 4] {
     use super::surface::*;
-    let ab = PatTm::let_(
-        [ObTm::var("ab"), ObTm::var("ba")],
-        MorTm::var("bond_AB"),
-        PatTm::tensor([PatTm::res("A", [MorTm::var("ab")]), PatTm::res("B", [MorTm::var("ba")])]),
-    );
-    let abc = PatTm::let_(
-        [ObTm::var("abc"), ObTm::var("cab")],
-        MorTm::app("bond_C", []),
-        PatTm::tensor([ab.clone(), PatTm::res("C", [])]),
+    let ab_free = PatTm::let_(
+        ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
+        MorTm::app("bond_AB", [MorTm::var("SiteC")]), // or maybe just MorTm::var("bond_AB")
+        PatTm::tensor([PatTm::res("A", [MorTm::var("s1")]), PatTm::res("B", [MorTm::var("s2")])]),
     );
     [
         ModelDecl::agent("A", [ObTm::var("ab")], [Ty::sort("SiteB")]),
         ModelDecl::agent("B", [ObTm::var("ba")], [Ty::sort("SiteA")]),
         ModelDecl::agent("C", [ObTm::var("cab")], [Ty::sort("SiteAB")]),
+        // ModelDecl::agent("C", [ObTm::var("abc")], [Ty::sort("SiteC")]),
         ModelDecl::rule(
-            "R_dimerization",
+            "dimerization",
             [],
             [],
             PatTm::tensor([
-                PatTm::res("A", [MorTm::var("e_B")]),
-                PatTm::res("B", [MorTm::var("e_A")]),
+                PatTm::res("A", [MorTm::app("e_B", [])]),
+                PatTm::res("B", [MorTm::app("e_A", [])]),
             ]),
-            ab.clone(),
+            ab_free.clone(),
         ),
-        ModelDecl::rule(
-            "R_trimerization",
-            [],
-            [],
-            PatTm::tensor([ab, PatTm::res("C", [MorTm::var("e_AB")])]),
-            abc,
-        ),
+        // TODO: fix type mismatch (see https://q.uiver.app/#q=WzAsNSxbMCwwLCJTaXRlQiJdLFsyLDIsIlNpdGVDIl0sWzQsMCwiU2l0ZUEiXSxbMiwwLCJTaXRlQiBcXG90aW1lcyBTaXRlQSJdLFsyLDQsIkkiXSxbMSwzLCJib25kX3tBQn0iXSxbNCwwLCJlbXB0eV9CIl0sWzQsMiwiZW1wdHlfQSIsMl0sWzQsMSwiZW1wdHlfQyIsMV1d)
+        // TODO: add trimerization rule
     ]
 }
+
+// #[cfg(test)]
+// fn model_decls_emergent_agent() -> [ModelDecl; 5] {
+// use super::surface::*;
+// let ab = PatTm::let_(
+// [ObTm::var("ab"), ObTm::var("ba")],
+// MorTm::var("bond_AB"),
+// PatTm::tensor([PatTm::res("A", [MorTm::var("ab")]), PatTm::res("B", [MorTm::var("ba")])]),
+// );
+// let ab_free = ab
+// .clone()
+// .subst(&mut vec![(name("bond_AB"), MorTm::app("bond_AB", MorTm::app("e_C", [])))]);
+// let abc = PatTm::let_(
+// [ObTm::var("abc"), ObTm::var("cab")],
+// MorTm::app("bond_C", []),
+// PatTm::tensor([
+// ab.clone().subst(&mut vec![(name("bond_AB"), MorTm::var("abc"))]),
+// PatTm::res("C", [MorTm::var("cab")]),
+// ]),
+// );
+// [
+// ModelDecl::agent("A", [ObTm::var("ab")], [Ty::sort("SiteB")]),
+// ModelDecl::agent("B", [ObTm::var("ba")], [Ty::sort("SiteA")]),
+// ModelDecl::agent("C", [ObTm::var("cab")], [Ty::sort("SiteAB")]),
+// ModelDecl::rule(
+// "R_dimerization",
+// [],
+// [],
+// PatTm::tensor([
+// PatTm::res("A", [MorTm::var("e_B")]),
+// PatTm::res("B", [MorTm::var("e_A")]),
+// ]),
+// ab.clone(),
+// ),
+// ModelDecl::rule(
+// "R_trimerization",
+// [],
+// [],
+// PatTm::tensor([ab_free, PatTm::res("C", [MorTm::var("e_AB")])]),
+// abc,
+// ),
+// ]
+// }
 
 #[cfg(test)]
 fn model_decls_directionality() -> [ModelDecl; 5] {
@@ -431,16 +465,20 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
         MorTm::var("bond_AB"),
         PatTm::tensor([PatTm::res("A", [MorTm::var("ab")]), PatTm::res("B", [MorTm::var("ba")])]),
     );
-
+    let site_c = Ty::tensor([Ty::sort("Site_Ch"), Ty::sort("Site_Ct")]);
+    let ab_free = ab.clone().subst(&mut vec![(
+        name("bond_AB"),
+        MorTm::app("bond_AB", MorTm::tensor([MorTm::app("e_Ch", []), MorTm::app("e_Cb", [])])),
+    )]);
     let abc = PatTm::let_(
         [ObTm::var("ac"), ObTm::var("bc"), ObTm::var("cab")],
         MorTm::app("bond_C", []),
         PatTm::tensor([
+            PatTm::res("C", [MorTm::var("cab")]),
             ab.clone().subst(&mut vec![(
                 name("bond_AB"),
                 MorTm::app("bond_AB", MorTm::tensor([MorTm::var("ac"), MorTm::var("bc")])),
             )]), // TODO: ask Evan how to do this
-            PatTm::res("C", [MorTm::var("cab")]),
         ]),
     );
 
@@ -479,7 +517,7 @@ fn model_decls_directionality() -> [ModelDecl; 5] {
             "R_trimerization",
             [],
             [],
-            PatTm::tensor([ab, PatTm::res("C", [MorTm::var("e_AB")])]),
+            PatTm::tensor([PatTm::res("C", [MorTm::var("e_AB")]), ab_free]),
             abc,
         ),
     ]
@@ -816,8 +854,8 @@ mod tests {
                 → let bond_AB in (A [0.0], B [0.1])
             [] : [] ⊢
               R_trimerization []
-                : (let bond_AB in (A [0.0], B [0.1]), C [e_AB])
-                → let bond_C [] in (let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]), C [0.2])
+                : (let bond_AB (e_Ch [], e_Cb []) in (A [0.0], B [0.1]), C [e_AB])
+                → let bond_C [] in (C [0.2], let bond_AB (0.0, 0.1) in (A [0.0], B [0.1]))
         "#]];
         expected.assert_eq(&toy_model_directionality().to_string());
 
