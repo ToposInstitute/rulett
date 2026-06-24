@@ -3,6 +3,7 @@ pub use rulett::{
     netgen::NetGenerator,
     ob_tm::ObTm,
     surface,
+    surface::*,
     theory::{Signature, SignatureDecl},
     ty::Ty,
 };
