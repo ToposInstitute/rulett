@@ -24,8 +24,8 @@ fn phospho_tyrosine_model_decls() -> [ModelDecl; 4] {
             "R_phosphorylation",
             [],
             [],
-            PatTm::res("C", [MorTm::app("u", MorTm::app("e_xtyr", []))]),
-            PatTm::res("C", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+            PatTm::res("C", [MorTm::app("u", [MorTm::app("e_xtyr", [])])]),
+            PatTm::res("C", [MorTm::app("p", [MorTm::app("e_xtyr", [])])]),
         ),
         ModelDecl::rule(
             "R_dimerization",
@@ -33,14 +33,14 @@ fn phospho_tyrosine_model_decls() -> [ModelDecl; 4] {
             [],
             PatTm::tensor([
                 PatTm::res("A", [MorTm::app("e_sh2", [])]),
-                PatTm::res("C", [MorTm::app("p", MorTm::app("e_xtyr", []))]),
+                PatTm::res("C", [MorTm::app("p", [MorTm::app("e_xtyr", [])])]),
             ]),
             PatTm::let_(
-                [ObTm::var("s1"), ObTm::var("s2")],
+                ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
                 MorTm::app("bond", []),
                 PatTm::tensor([
                     PatTm::res("A", [MorTm::var("s1")]),
-                    PatTm::res("C", [MorTm::app("p", MorTm::var("s2"))]),
+                    PatTm::res("C", [MorTm::app("p", [MorTm::var("s2")])]),
                 ]),
             ),
         ),
@@ -70,11 +70,11 @@ fn parse() {
         [x] : [SH2] ⊢ A [x]
         [y] : [Tyr] ⊢ C [y]
         #/ rules:
-        [] : [] ⊢ R_phosphorylation [] : C [u e_xtyr []] → C [p e_xtyr []]
+        [] : [] ⊢ R_phosphorylation [] : C [u [e_xtyr []]] → C [p [e_xtyr []]]
         [] : [] ⊢
           R_dimerization []
-            : (A [e_sh2 []], C [p e_xtyr []])
-            → let bond [] in (A [0.0], C [p 0.1])
+            : (A [e_sh2 []], C [p [e_xtyr []]])
+            → let bond [] in (A [0.0], C [p [0.1]])
     "#]];
     expected.assert_eq(&phospho_tyrosine_model().to_string());
 }
@@ -87,14 +87,15 @@ fn netgen() {
     let net = expect![[r#"
         #/ species:
         A [e_sh2 []]
-            C [u [e_xtyr []]]
-            C [p [e_xtyr []]]
-            let bond [] in (A [0.0], C [u [0.1]])
-            let bond [] in (A [0.0], C [p [0.1]])
+        C [u [e_xtyr []]]
+        C [p [e_xtyr []]]
+        let bond [] in (A [0.0], C [u [0.1]])
+        let bond [] in (A [0.0], C [p [0.1]])
         #/ transitions:
-        R_phosphorylation [] : A [u e_xtyr] → A [p e_xtyr]
-            R_dimerization []
-              : (A [e_sh2], C [p e_xtyr])
-              → let bond [] in (A [0.0], C [p 0.1])"#]];
+        R_phosphorylation [] : [C [u [e_xtyr []]]] → [C [p [e_xtyr []]]]
+        R_dimerization []
+          : [A [e_sh2 []], C [p [e_xtyr []]]]
+          → [let bond [] in (A [0.0], C [p [0.1]])]
+    "#]];
     net.assert_eq(&generator.net(2).to_string());
 }

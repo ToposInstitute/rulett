@@ -39,7 +39,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
             [Ty::sort("TyHalo"), Ty::sort("TyHalo")],
             PatTm::tensor([
                 PatTm::let_(
-                    [ObTm::var("r1"), ObTm::var("r2")],
+                    ObTm::tensor([ObTm::var("r1"), ObTm::var("r2")]),
                     MorTm::app("bond_c", []),
                     PatTm::tensor([
                         PatTm::res("CH3_dot", [MorTm::var("r1")]),
@@ -47,7 +47,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
                     ]),
                 ),
                 PatTm::let_(
-                    [ObTm::var("p"), ObTm::var("n")],
+                    ObTm::tensor([ObTm::var("p"), ObTm::var("n")]),
                     MorTm::app("bond_i", []),
                     PatTm::tensor([
                         PatTm::res("Na", [MorTm::var("p")]),
@@ -57,7 +57,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
             ]),
             PatTm::tensor([
                 PatTm::let_(
-                    [ObTm::var("r1"), ObTm::var("r2")],
+                    ObTm::tensor([ObTm::var("r1"), ObTm::var("r2")]),
                     MorTm::app("bond_c", []),
                     PatTm::tensor([
                         PatTm::res("CH3_dot", [MorTm::var("r1")]),
@@ -65,7 +65,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
                     ]),
                 ),
                 PatTm::let_(
-                    [ObTm::var("p"), ObTm::var("n")],
+                    ObTm::tensor([ObTm::var("p"), ObTm::var("n")]),
                     MorTm::app("bond_i", []),
                     PatTm::tensor([
                         PatTm::res("Na", [MorTm::var("p")]),
@@ -80,7 +80,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
             [Ty::sort("TyHalo")],
             PatTm::tensor([
                 PatTm::let_(
-                    [ObTm::var("r1"), ObTm::var("r2")],
+                    ObTm::tensor([ObTm::var("r1"), ObTm::var("r2")]),
                     MorTm::app("bond_c", []),
                     PatTm::tensor([
                         PatTm::res("CH3_dot", [MorTm::var("r1")]),
@@ -88,7 +88,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
                     ]),
                 ),
                 PatTm::let_(
-                    [ObTm::var("p"), ObTm::var("n")],
+                    ObTm::tensor([ObTm::var("p"), ObTm::var("n")]),
                     MorTm::app("bond_i", []),
                     PatTm::tensor([
                         PatTm::res("Na", [MorTm::var("p")]),
@@ -98,7 +98,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
             ]),
             PatTm::tensor([
                 PatTm::let_(
-                    [ObTm::var("r1"), ObTm::var("r2")],
+                    ObTm::tensor([ObTm::var("r1"), ObTm::var("r2")]),
                     MorTm::app("bond_c", []),
                     PatTm::tensor([
                         PatTm::res("CH3_dot", [MorTm::var("r1")]),
@@ -106,7 +106,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
                     ]),
                 ),
                 PatTm::let_(
-                    [ObTm::var("p"), ObTm::var("n")],
+                    ObTm::tensor([ObTm::var("p"), ObTm::var("n")]),
                     MorTm::app("bond_i", []),
                     PatTm::tensor([
                         PatTm::res("Na", [MorTm::var("p")]),
