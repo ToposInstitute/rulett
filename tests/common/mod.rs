@@ -1,14 +1,14 @@
 pub use rulett::{
-    // core::*,
+    core::*,
     model::*,
-    // model::{Model, ModelDecl},
-    // net::*,
+    model::{Model, ModelDecl},
+    net::*,
     netgen::NetGenerator,
     ob_tm::ObTm,
     surface,
     surface::*,
     theory::{Signature, SignatureDecl},
-    // ty::Ty,
+    ty::Ty,
     ty::*,
 };
 
