@@ -1,11 +1,15 @@
 pub use rulett::{
-    model::{Model, ModelDecl},
+    // core::*,
+    model::*,
+    // model::{Model, ModelDecl},
+    // net::*,
     netgen::NetGenerator,
     ob_tm::ObTm,
     surface,
     surface::*,
     theory::{Signature, SignatureDecl},
-    ty::Ty,
+    // ty::Ty,
+    ty::*,
 };
 
 pub use expect_test::expect;
