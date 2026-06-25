@@ -16,6 +16,7 @@ fn organic_chemistry_signature() -> Signature {
 }
 
 fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
+    use surface::*;
     [
         ModelDecl::agent("Na", [ObTm::var("p")], [Ty::sort("Pos")]),
         ModelDecl::agent("H_minus", [ObTm::var("n")], [Ty::sort("Neg")]),
