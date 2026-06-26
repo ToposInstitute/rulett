@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model id="toy_model_v1" name="toy_model_v1">
+    <listOfCompartments>
+      <compartment id="default" name="default" size="1" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="species_0" name="A [unphos [], empty []]" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_1" name="A [phos [], empty []]" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_2" name="B [empty []]" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_3" name="K []" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_4" name="let bond [] in (A [unphos [], 0.0], A [unphos [], 0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_5" name="let bond [] in (A [phos [], 0.1], A [unphos [], 0.0])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_6" name="let bond [] in (A [phos [], 0.0], A [unphos [], 0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_7" name="let bond [] in (A [phos [], 0.0], A [phos [], 0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_8" name="let bond [] in (A [unphos [], 0.0], B [0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_9" name="let bond [] in (A [phos [], 0.0], B [0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_10" name="let bond [] in (B [0.0], B [0.1])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_11" name="let bond [] in (A [unphos [], 0.1], B [0.0])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+      <species id="species_12" name="let bond [] in (A [phos [], 0.1], B [0.0])" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter id="k0" value="1"/>
+      <parameter id="k1" value="1"/>
+      <parameter id="k2" value="1"/>
+      <parameter id="k3" value="1"/>
+      <parameter id="k4" value="1"/>
+      <parameter id="k5" value="1"/>
+      <parameter id="k6" value="1"/>
+    </listOfParameters>
+    <listOfReactions>
+      <reaction id="reaction_0" name="bondAB [unphos []]" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_0" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_2" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_8" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k0</ci><ci>species_0</ci><ci>species_2</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_1" name="bondAB [phos []]" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_1" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_2" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_9" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k1</ci><ci>species_1</ci><ci>species_2</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_2" name="phosphorylate [empty []]" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_0" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_1" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k2</ci><ci>species_0</ci><ci>species_3</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_3" name="let bond [] in (A [unphos [], 0.0], phosphorylate [0.1])" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_4" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_5" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k3</ci><ci>species_4</ci><ci>species_3</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_4" name="let bond [] in (A [phos [], 0.0], phosphorylate [0.1])" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_6" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_7" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k4</ci><ci>species_6</ci><ci>species_3</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_5" name="let bond [] in (B [0.0], phosphorylate [0.1])" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_11" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_12" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k5</ci><ci>species_11</ci><ci>species_3</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+      <reaction id="reaction_6" name="let bond [] in (phosphorylate [0.0], phosphorylate [0.1])" reversible="false">
+        <listOfReactants>
+          <speciesReference species="species_4" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfReactants>
+        <listOfProducts>
+          <speciesReference species="species_7" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+          <speciesReference species="species_3" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply><times/><ci>k6</ci><ci>species_4</ci><ci>species_3</ci><ci>species_3</ci></apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>
