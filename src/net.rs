@@ -229,30 +229,31 @@ fn xml_escape(value: &str) -> String {
 mod tests {
     use super::{super::model, super::netgen::NetGenerator};
     use expect_test::expect;
+    use itertools::Itertools;
     use std::fs;
 
     // Test output of toy_model_v1
     #[test]
-    fn toy_model_v1() {
+    fn toy_model_v2() {
         let model = model::toy_model_v1();
         let generator = NetGenerator::new(&model);
-        // let species = expect![[r#"
-        // A [unphos [], empty []]
-        // A [phos [], empty []]
-        // B [empty []]
-        // K []
-        // let bond [] in (A [unphos [], 0.0], A [unphos [], 0.1])
-        // let bond [] in (A [unphos [], 0.0], A [phos [], 0.1])
-        // let bond [] in (A [phos [], 0.0], A [unphos [], 0.1])
-        // let bond [] in (A [phos [], 0.0], A [phos [], 0.1])
-        // let bond [] in (A [unphos [], 0.0], B [0.1])
-        // let bond [] in (A [phos [], 0.0], B [0.1])
-        // let bond [] in (B [0.0], B [0.1])"#]];
-        // species.assert_eq(&generator.species(2).join("\n")); // method not found in `impl Iterator<Item = core::tm::PatTm>
+        let species = expect![[r#"
+        A [unphos [], empty []]
+        A [phos [], empty []]
+        B [empty []]
+        K []
+        let bond [] in (A [unphos [], 0.0], A [unphos [], 0.1])
+        let bond [] in (A [unphos [], 0.0], A [phos [], 0.1])
+        let bond [] in (A [phos [], 0.0], A [unphos [], 0.1])
+        let bond [] in (A [phos [], 0.0], A [phos [], 0.1])
+        let bond [] in (A [unphos [], 0.0], B [0.1])
+        let bond [] in (A [phos [], 0.0], B [0.1])
+        let bond [] in (B [0.0], B [0.1])"#]];
+        species.assert_eq(&generator.species(2).join("\n")); // method not found in `impl Iterator<Item = core::tm::PatTm>
 
         // "tests/fixtures/toy_model_v1.xml", but OS independent version
         let file_path = "tests/fixtures/toy_model_v1.xml";
-        &generator.net(2).export_sbml(file_path).unwrap();
+        generator.net(2).export_sbml(file_path).unwrap();
 
         // 2. Read the content of the generated file
         let actual_content =
