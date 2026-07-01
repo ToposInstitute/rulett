@@ -62,7 +62,7 @@ fn ground_localization() -> Signature {
 
 fn model_decl() -> [ModelDecl; 6] {
     use crate::surface::*;
-    // TODO: make location mandatory for this setting (perhaps by adding a loc field to agents?)
+    // TODO: make location mandatory for this setting (perhaps by adding a loctm and locty fields to agents?)
     [
         ModelDecl::agent(
             "A",
@@ -101,6 +101,7 @@ fn model_decl() -> [ModelDecl; 6] {
                 ]),
             ),
         ),
+        // @Evan: note that `l` appears multiple times here, cause K cannot phosphorylate A if they are in different compartments.
         ModelDecl::rule(
             "phosphorylate",
             [ObTm::var("s"), ObTm::var("l")],
@@ -193,4 +194,107 @@ fn parse_model() {
             → (A [phos [], s, l], K [l])
     "#]];
     expected.assert_eq(&model().to_string());
+}
+
+// use super::{super::model, super::theory::*, *};
+
+#[test]
+fn generate_network() {
+    use itertools::Itertools;
+    let model = model();
+    let generator = NetGenerator::new(&model);
+
+    // TODO: Think about whether you want to have multi-compartment species here (e.g.: let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])).
+    let species = expect![[r#"
+        A [unphos [], emptyA [], cyt [!cyt []]]
+        A [unphos [], emptyA [], nuc [!nuc []]]
+        A [phos [], emptyA [], cyt [!cyt []]]
+        A [phos [], emptyA [], nuc [!nuc []]]
+        B [emptyB [], cyt [!cyt []]]
+        B [emptyB [], nuc [!nuc []]]
+        K [cyt [!cyt []]]
+        K [nuc [!nuc []]]
+        let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, cyt [!cyt []]])
+        let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])
+        let bond [] in (A [unphos [], 0.0, nuc [!nuc []]], B [0.1, cyt [!cyt []]])
+        let bond [] in (A [unphos [], 0.0, nuc [!nuc []]], B [0.1, nuc [!nuc []]])
+        let bond [] in (A [phos [], 0.0, cyt [!cyt []]], B [0.1, cyt [!cyt []]])
+        let bond [] in (A [phos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])
+        let bond [] in (A [phos [], 0.0, nuc [!nuc []]], B [0.1, cyt [!cyt []]])
+        let bond [] in (A [phos [], 0.0, nuc [!nuc []]], B [0.1, nuc [!nuc []]])"#]];
+    species.assert_eq(&generator.species(2).join("\n"));
+
+    let transitions = expect![[r#"
+        nuclear_import_phospho_A [emptyA []]
+          : A [p, emptyA [], !cyt []]
+          → A [p, emptyA [], !nuc []]
+        bondAB [unphos [], cyt [!cyt []]]
+          : (A [unphos [], emptyA [], cyt [!cyt []]], B [emptyB [], cyt [!cyt []]])
+          → let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, cyt [!cyt []]])
+        bondAB [unphos [], nuc [!nuc []]]
+          : (A [unphos [], emptyA [], nuc [!nuc []]], B [emptyB [], nuc [!nuc []]])
+          → let bond [] in (A [unphos [], 0.0, nuc [!nuc []]], B [0.1, nuc [!nuc []]])
+        bondAB [phos [], cyt [!cyt []]]
+          : (A [phos [], emptyA [], cyt [!cyt []]], B [emptyB [], cyt [!cyt []]])
+          → let bond [] in (A [phos [], 0.0, cyt [!cyt []]], B [0.1, cyt [!cyt []]])
+        bondAB [phos [], nuc [!nuc []]]
+          : (A [phos [], emptyA [], nuc [!nuc []]], B [emptyB [], nuc [!nuc []]])
+          → let bond [] in (A [phos [], 0.0, nuc [!nuc []]], B [0.1, nuc [!nuc []]])
+        phosphorylate [emptyA [], cyt [!cyt []]]
+          : (A [unphos [], emptyA [], cyt [!cyt []]], K [cyt [!cyt []]])
+          → (A [phos [], emptyA [], cyt [!cyt []]], K [cyt [!cyt []]])
+        phosphorylate [emptyA [], nuc [!nuc []]]
+          : (A [unphos [], emptyA [], nuc [!nuc []]], K [nuc [!nuc []]])
+          → (A [phos [], emptyA [], nuc [!nuc []]], K [nuc [!nuc []]])
+        let bond [] in (B [0.1, cyt [!cyt []]], nuclear_import_phospho_A [0.0])
+          : let bond [] in (B [0.1, cyt [!cyt []]], A [p, 0.0, !cyt []])
+          → let bond [] in (B [0.1, cyt [!cyt []]], A [p, 0.0, !nuc []])
+        let bond [] in (B [0.1, nuc [!nuc []]], nuclear_import_phospho_A [0.0])
+          : let bond [] in (B [0.1, nuc [!nuc []]], A [p, 0.0, !cyt []])
+          → let bond [] in (B [0.1, nuc [!nuc []]], A [p, 0.0, !nuc []])
+        let bond [] in (B [0.1, cyt [!cyt []]], phosphorylate [0.0, cyt [!cyt []]])
+          : let bond [] in
+            (
+              B [0.1, cyt [!cyt []]],
+              (A [unphos [], 0.0, cyt [!cyt []]], K [cyt [!cyt []]])
+            )
+          → let bond [] in
+            (
+              B [0.1, cyt [!cyt []]],
+              (A [phos [], 0.0, cyt [!cyt []]], K [cyt [!cyt []]])
+            )
+        let bond [] in (B [0.1, cyt [!cyt []]], phosphorylate [0.0, nuc [!nuc []]])
+          : let bond [] in
+            (
+              B [0.1, cyt [!cyt []]],
+              (A [unphos [], 0.0, nuc [!nuc []]], K [nuc [!nuc []]])
+            )
+          → let bond [] in
+            (
+              B [0.1, cyt [!cyt []]],
+              (A [phos [], 0.0, nuc [!nuc []]], K [nuc [!nuc []]])
+            )
+        let bond [] in (B [0.1, nuc [!nuc []]], phosphorylate [0.0, cyt [!cyt []]])
+          : let bond [] in
+            (
+              B [0.1, nuc [!nuc []]],
+              (A [unphos [], 0.0, cyt [!cyt []]], K [cyt [!cyt []]])
+            )
+          → let bond [] in
+            (
+              B [0.1, nuc [!nuc []]],
+              (A [phos [], 0.0, cyt [!cyt []]], K [cyt [!cyt []]])
+            )
+        let bond [] in (B [0.1, nuc [!nuc []]], phosphorylate [0.0, nuc [!nuc []]])
+          : let bond [] in
+            (
+              B [0.1, nuc [!nuc []]],
+              (A [unphos [], 0.0, nuc [!nuc []]], K [nuc [!nuc []]])
+            )
+          → let bond [] in
+            (
+              B [0.1, nuc [!nuc []]],
+              (A [phos [], 0.0, nuc [!nuc []]], K [nuc [!nuc []]])
+            )"#]];
+    transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
