@@ -26,7 +26,10 @@
 /// but does not fire in a cell that expresses only
 /// - CCNB1 and CCNB2
 ///
-/// Here, we do not model complex formation explicitly. The purpose for providing an environment is
+/// The signature can be illustrated as follows:
+/// https://q.uiver.app/#q=WzAsMTQsWzEsMCwiXFxtYXRocm17VHlNb2xlY3VsZX0iXSxbMCwxLCJcXG1hdGhybXtUeUNESzF9Il0sWzEsMSwiXFxtYXRocm17VHlDQ05CMX0iXSxbMiwxLCJcXG1hdGhybXtUeUNDTkIyfSJdLFswLDIsIlxcdGV4dHtDZWxsLWxpbmV9XzEiXSxbMSwyLCJcXHRleHR7Q2VsbC1saW5lfV8yIl0sWzIsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMyJdLFsxLDMsIlxcdGV4dHtDZWxsfV9cXHRleHR7b21uaXBvdGVudH0iXSxbNCwyLCJcXHRleHR7Q2VsbC1saW5lfV8xIl0sWzUsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMiJdLFs2LDIsIlxcdGV4dHtDZWxsLWxpbmV9XzMiXSxbNSwzLCJcXHRleHR7Q2VsbH1fXFx0ZXh0e29tbmlwb3RlbnR9Il0sWzUsMCwiXFxtYXRocm17VHlFbnZ9Il0sWzQsMSwiXFx0ZXh0e0NlbGwtbGluZX1fezEyfSJdLFsxLDBdLFs0LDFdLFs0LDJdLFs1LDFdLFs1LDNdLFs2LDJdLFs2LDNdLFs3LDRdLFs3LDVdLFs3LDZdLFszLDBdLFsyLDBdLFsxMSw4XSxbMTEsOV0sWzEwLDEyXSxbMTEsMTBdLFsxMywxMl0sWzgsMTNdLFs5LDEzXV0=
+///
+/// Note that we do not model complex formation explicitly. The purpose for providing an environment is
 /// to allow modelers to optionally abstract away such detailed reactions.
 ///
 mod common;
