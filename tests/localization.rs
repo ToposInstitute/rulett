@@ -6,24 +6,6 @@
 mod common;
 use common::*;
 
-/// Function to merge two signatures
-fn merge_signatures(sigs: &[Signature]) -> Signature {
-    let mut merged = Signature::new();
-    for sig in sigs {
-        for sort in sig.sorts() {
-            if !merged.sorts().any(|s| s == sort) {
-                merged.add_sort(sort).unwrap();
-            }
-        }
-        for (op, dom, cod) in sig.operations() {
-            if merged.interface(&op).is_none() {
-                merged.add_operation(op, dom.clone(), cod.clone()).unwrap();
-            }
-        }
-    }
-    merged
-}
-
 /// Signature for a toy model (variant 2).
 fn toy_signature_v2() -> Signature {
     Signature::parse([
@@ -122,8 +104,6 @@ fn model() -> Model {
     let decls = model_decl();
     Model::parse(signature(), decls).unwrap()
 }
-
-use expect_test::expect;
 
 /// Signature for toy_model_v2 with localization
 fn signature() -> Signature {
