@@ -1,41 +1,39 @@
-/// Certain rules have implicit dependencies. For example, a phosphorylation
-/// rule can only fire if ATP is present, gene expression can only fire if
-/// transcription-translation machinery (RNA-polymerase, ribosomes, etc.)
-/// are present, etc.
-///
-/// Here we make these dependencies explicit by putting them on either side
-/// of a rule. To formulate dependencies, we introduce product species to the
-/// signature like so:
-/// https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiVHlBQiJdLFsxLDIsIlR5QUMiXSxbMiwyLCJUeUJDIl0sWzEsMywiVHlBQkMiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=
-///
-/// or to use more suggestive labelling:
-/// https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiQ2VsbFgiXSxbMSwyLCJDZWxsWSJdLFsyLDIsIkNlbGxaIl0sWzEsMywiQ2VsbE9tbmlwb3RlbnQiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=
-///
-/// I.e. an environment is a capability that combines the capabilities of its underlying species.
-///
-/// Environments are "made available" in the same way as species: by providing
-/// "grounding signatures" consisting of morphisms out of `[]`.
-///
-/// Note: this requires product species (issue #9), which is currently not a priority.
-///
-/// The example below illustrates the phoshporylation of CDC25, which requires either a
-/// CDK1.CCNB1 or CDK1.CCNB2 complex. We show that this reaction fires in a cell that expresses only
-/// - CDK1 and CCNB1
-/// - CDK1 and CCNB2
-///
-/// but does not fire in a cell that expresses only
-/// - CCNB1 and CCNB2
-///
-/// The signature can be illustrated as follows:
-/// https://q.uiver.app/#q=WzAsMTQsWzEsMCwiXFxtYXRocm17VHlNb2xlY3VsZX0iXSxbMCwxLCJcXG1hdGhybXtUeUNESzF9Il0sWzEsMSwiXFxtYXRocm17VHlDQ05CMX0iXSxbMiwxLCJcXG1hdGhybXtUeUNDTkIyfSJdLFswLDIsIlxcdGV4dHtDZWxsLWxpbmV9XzEiXSxbMSwyLCJcXHRleHR7Q2VsbC1saW5lfV8yIl0sWzIsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMyJdLFsxLDMsIlxcdGV4dHtDZWxsfV9cXHRleHR7b21uaXBvdGVudH0iXSxbNCwyLCJcXHRleHR7Q2VsbC1saW5lfV8xIl0sWzUsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMiJdLFs2LDIsIlxcdGV4dHtDZWxsLWxpbmV9XzMiXSxbNSwzLCJcXHRleHR7Q2VsbH1fXFx0ZXh0e29tbmlwb3RlbnR9Il0sWzUsMCwiXFxtYXRocm17VHlFbnZ9Il0sWzQsMSwiXFx0ZXh0e0NlbGwtbGluZX1fezEyfSJdLFsxLDBdLFs0LDFdLFs0LDJdLFs1LDFdLFs1LDNdLFs2LDJdLFs2LDNdLFs3LDRdLFs3LDVdLFs3LDZdLFszLDBdLFsyLDBdLFsxMSw4XSxbMTEsOV0sWzEwLDEyXSxbMTEsMTBdLFsxMywxMl0sWzgsMTNdLFs5LDEzXV0=
-///
-/// Note that we do not model complex formation explicitly. The purpose for providing an environment is
-/// to allow modelers to optionally abstract away such detailed reactions.
-///
+//! Certain rules have implicit dependencies. For example, a phosphorylation
+//! rule can only fire if ATP is present, gene expression can only fire if
+//! transcription-translation machinery (RNA-polymerase, ribosomes, etc.)
+//! are present, etc.
+//!
+//! We call the totalty of dependencies an "environment". The required environment for the rule can be
+//! made explicit by putting it on either side of a rule. We can use product species in the signature to
+//! define environments as shown
+//! [here](https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiVHlBQiJdLFsxLDIsIlR5QUMiXSxbMiwyLCJUeUJDIl0sWzEsMywiVHlBQkMiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=)
+//! or, using more suggestive labelling,
+//! [here](https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiQ2VsbFgiXSxbMSwyLCJDZWxsWSJdLFsyLDIsIkNlbGxaIl0sWzEsMywiQ2VsbE9tbmlwb3RlbnQiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=)
+//!
+//! I.e. an environment is a capability that combines the capabilities of its underlying species.
+//!
+//! Environments are "made available" in the same way as species: by providing
+//! "grounding signatures", that is, morphisms out of `[]`.
+//!
+//! Note: this requires product species (issue #9), which is currently not a priority.
+//! The example below illustrates the phoshporylation of CDC25, which requires either a
+//! CDK1.CCNB1 or CDK1.CCNB2 complex. We show that this reaction fires in a cell that expresses only
+//! - CDK1 and CCNB1
+//! - CDK1 and CCNB2
+//!
+//! but does not fire in a cell that expresses only
+//! - CCNB1 and CCNB2
+//!
+//! The signature can be illustrated as follows:
+//! https://q.uiver.app/#q=WzAsMTQsWzEsMCwiXFxtYXRocm17VHlNb2xlY3VsZX0iXSxbMCwxLCJcXG1hdGhybXtUeUNESzF9Il0sWzEsMSwiXFxtYXRocm17VHlDQ05CMX0iXSxbMiwxLCJcXG1hdGhybXtUeUNDTkIyfSJdLFswLDIsIlxcdGV4dHtDZWxsLWxpbmV9XzEiXSxbMSwyLCJcXHRleHR7Q2VsbC1saW5lfV8yIl0sWzIsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMyJdLFsxLDMsIlxcdGV4dHtDZWxsfV9cXHRleHR7b21uaXBvdGVudH0iXSxbNCwyLCJcXHRleHR7Q2VsbC1saW5lfV8xIl0sWzUsMiwiXFx0ZXh0e0NlbGwtbGluZX1fMiJdLFs2LDIsIlxcdGV4dHtDZWxsLWxpbmV9XzMiXSxbNSwzLCJcXHRleHR7Q2VsbH1fXFx0ZXh0e29tbmlwb3RlbnR9Il0sWzUsMCwiXFxtYXRocm17VHlFbnZ9Il0sWzQsMSwiXFx0ZXh0e0NlbGwtbGluZX1fezEyfSJdLFsxLDBdLFs0LDFdLFs0LDJdLFs1LDFdLFs1LDNdLFs2LDJdLFs2LDNdLFs3LDRdLFs3LDVdLFs3LDZdLFszLDBdLFsyLDBdLFsxMSw4XSxbMTEsOV0sWzEwLDEyXSxbMTEsMTBdLFsxMywxMl0sWzgsMTNdLFs5LDEzXV0=
+//!
+//! Note that we do not model complex formation explicitly. The purpose for providing an environment is
+//! to allow modelers to optionally abstract away such detailed reactions.
+
 mod common;
 use common::*;
 
-/// Base signature
+/// Base signature.
 fn base_signature() -> Signature {
     Signature::parse([
         SignatureDecl::sort("TyMolecule"),
@@ -50,7 +48,7 @@ fn base_signature() -> Signature {
     .unwrap()
 }
 
-/// Signature for the model environment (i.e. the dependencies)
+/// Signature for the model environment.
 fn environment_signature() -> Signature {
     Signature::parse([
         // Define different cell lines in terms of their components (note that this has currently no effect, i.e. can be considered annotation).
@@ -82,7 +80,7 @@ fn environment_signature() -> Signature {
             [Ty::sort("CellOmnipotent")],
             Ty::sort("CellLine3"),
         ),
-        // Define CellLine12
+        // Define CellLine12 as coproduct of CellLine1 and CellLine2
         SignatureDecl::sort("CellLine12"),
         SignatureDecl::operation("iota_cl1in12", [Ty::sort("CellLine1")], Ty::sort("CellLine12")),
         SignatureDecl::operation("iota_cl2in12", [Ty::sort("CellLine2")], Ty::sort("CellLine12")),
@@ -93,7 +91,7 @@ fn environment_signature() -> Signature {
     .unwrap()
 }
 
-/// Signature to ground the base in []
+/// Signature to ground the base in `[]``.
 fn ground_base() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Res"),
@@ -103,7 +101,7 @@ fn ground_base() -> Signature {
     .unwrap()
 }
 
-/// Signature to ground the environment in []
+/// Signature to ground the environment in `[]`.
 fn ground_environment(n: i32) -> Signature {
     Signature::parse([
         SignatureDecl::sort(format!("CellLine{n}")),
@@ -112,7 +110,7 @@ fn ground_environment(n: i32) -> Signature {
     .unwrap()
 }
 
-/// Full signature
+/// Full signature.
 fn signature(n: i32) -> Signature {
     let sig1 = base_signature();
     let sig2 = environment_signature();
@@ -121,9 +119,9 @@ fn signature(n: i32) -> Signature {
     merge_signatures(&[sig1, sig2, sig3, sig4])
 }
 
+// Declares Model.
 fn model_decl() -> [ModelDecl; 3] {
     use crate::surface::*;
-    // TODO: make location mandatory for this setting (perhaps by adding a loctm and locty fields to agents?)
     [
         ModelDecl::agent("CDC25", [ObTm::var("r")], [Ty::sort("Res")]),
         ModelDecl::agent("Env", [ObTm::var("e")], [Ty::sort("TyEnv")]),
@@ -144,6 +142,7 @@ fn model_decl() -> [ModelDecl; 3] {
     ]
 }
 
+// Generates Model.
 fn model(n: i32) -> Model {
     let decls = model_decl();
     Model::parse(signature(n), decls).unwrap()
@@ -233,16 +232,13 @@ fn parse_model() {
     expected.assert_eq(&model(1).to_string());
 }
 
-// use super::{super::model, super::theory::*, *};
-
-// Reaction fires in cell line 1
+// Test that reaction fires in CellLine1.
 #[test]
 fn generate_network_1() {
     use itertools::Itertools;
     let model = model(1);
     let generator = NetGenerator::new(&model);
 
-    // TODO: Think about whether you want to have multi-compartment species here (e.g.: let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])).
     let species = expect![[r#"
         CDC25 [u []]
         CDC25 [p []]
@@ -256,14 +252,13 @@ fn generate_network_1() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-// Reaction fires in cell line 2
+// Test that reaction fires in CellLine2.
 #[test]
 fn generate_network_2() {
     use itertools::Itertools;
     let model = model(2);
     let generator = NetGenerator::new(&model);
 
-    // TODO: Think about whether you want to have multi-compartment species here (e.g.: let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])).
     let species = expect![[r#"
         CDC25 [u []]
         CDC25 [p []]
@@ -277,14 +272,13 @@ fn generate_network_2() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-// Reaction does not fire in cell line 3
+// Test that reaction does not fire in CellLine3.
 #[test]
 fn generate_network_3() {
     use itertools::Itertools;
     let model = model(3);
     let generator = NetGenerator::new(&model);
 
-    // TODO: Think about whether you want to have multi-compartment species here (e.g.: let bond [] in (A [unphos [], 0.0, cyt [!cyt []]], B [0.1, nuc [!nuc []]])).
     let species = expect![[r#"
         CDC25 [u []]
         CDC25 [p []]
@@ -294,3 +288,5 @@ fn generate_network_3() {
     let transitions = expect![""];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
+
+// TODO: Create example for CellOmnipotent once we can handel product species (issue #9)

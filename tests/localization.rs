@@ -1,8 +1,8 @@
-/// Eucaryotic cells contain membrane-enclosed compartments.
-/// The concentrations of chemical species may differ between compartments.
-/// To describe this circumstance, we can introduce a preorder of compartments
-/// to our typing category.
-///
+//! Eucaryotic cells contain membrane-enclosed compartments.
+//! The concentrations of chemical species may differ between compartments.
+//! To describe this circumstance, we can introduce a signature repesenting a
+//! preorder of compartments.
+
 mod common;
 use common::*;
 
@@ -21,7 +21,8 @@ fn toy_signature_v2() -> Signature {
     .unwrap()
 }
 
-fn signature_localization() -> Signature {
+/// Signature for location.
+fn signature_location() -> Signature {
     Signature::parse([
         SignatureDecl::sort("LocCell"),
         SignatureDecl::sort("LocCyt"), // Cytoplasm
@@ -32,6 +33,7 @@ fn signature_localization() -> Signature {
     .unwrap()
 }
 
+/// Grounds location signature in `[]`.
 fn ground_localization() -> Signature {
     Signature::parse([
         SignatureDecl::sort("LocCyt"),                            // Cytoplasm
@@ -42,9 +44,10 @@ fn ground_localization() -> Signature {
     .unwrap()
 }
 
+/// Declares Model.
 fn model_decl() -> [ModelDecl; 6] {
     use crate::surface::*;
-    // TODO: make location mandatory for this setting (perhaps by adding a loctm and locty fields to agents?)
+    // TODO: make location mandatory for this setting (perhaps by adding a `loctm` and `locty` fields to agents?)
     [
         ModelDecl::agent(
             "A",
@@ -100,15 +103,16 @@ fn model_decl() -> [ModelDecl; 6] {
     ]
 }
 
+/// Generates Model.
 fn model() -> Model {
     let decls = model_decl();
     Model::parse(signature(), decls).unwrap()
 }
 
-/// Signature for toy_model_v2 with localization
+/// Signature for toy_model_v2 with localization.
 fn signature() -> Signature {
     let sig1 = toy_signature_v2();
-    let sig2 = signature_localization();
+    let sig2 = signature_location();
     let sig3 = ground_localization();
     merge_signatures(&[sig1, sig2, sig3])
 }
@@ -175,8 +179,6 @@ fn parse_model() {
     "#]];
     expected.assert_eq(&model().to_string());
 }
-
-// use super::{super::model, super::theory::*, *};
 
 #[test]
 fn generate_network() {

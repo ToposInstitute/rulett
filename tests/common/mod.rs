@@ -9,7 +9,7 @@ pub use rulett::{
 
 pub use expect_test::expect;
 
-/// Function to merge two signatures
+/// Merges multiple signatures.
 pub fn merge_signatures(sigs: &[Signature]) -> Signature {
     let mut merged = Signature::new();
     for sig in sigs {
