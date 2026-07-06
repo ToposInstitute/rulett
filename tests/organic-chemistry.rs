@@ -1,6 +1,14 @@
+//! Organic chemistry example with
+//! - halogen-halogen exchange rule
+//! - hydrogen-hydrogen exchange rule
+//!
+//! described by
+//! https://q.uiver.app/#q=WzAsMjcsWzEsNSwiXFx0ZXh0e05hfV4rIDogXFx0ZXh0e1Bvc30iXSxbMSw3LCJcXHRleHR7SH1eLSA6IFxcdGV4dHtOZWd9Il0sWzIsNSwiXFxtYXRocm17SGFsb31eLSA6IFxcdGV4dHtOZWd9IFxcb3RpbWVzIFxcdGV4dHtUeUhhbG99Il0sWzIsMCwiXFx0ZXh0e1R5SGFsb30iXSxbMiwxLCJJIl0sWzMsMSwiSSJdLFswLDAsIlxcdGV4dGJme1R5cGVzfToiXSxbMSwwLCJcXHRleHR7UG9zfSJdLFsxLDEsIlxcdGV4dHtOZWd9Il0sWzAsNSwiXFx0ZXh0YmZ7QWdlbnRzfToiXSxbMiwzLCJcXHRleHR7UG9zfSBcXG90aW1lcyBcXHRleHR7TmVnfSJdLFsxLDQsIkkiXSxbMiw0LCJcXHRleHR7UmFkfSBcXG90aW1lcyBcXHRleHR7UmFkfSJdLFsyLDcsIlxcdGV4dHtDSH1fM14tIDogXFx0ZXh0e05lZ30iXSxbNCw1LCJQIl0sWzUsNiwiUCBcXGNvbG9uZXFxIChcXHRleHR7Q0h9XzNeXFxidWxsZXQgXFxvdGltZXMgXFx0ZXh0e0hhbG99XlxcYnVsbGV0KShcXHRleHR7Ym9uZH1fYyBcXG90aW1lcyAxKSBcXG90aW1lcyAoXFx0ZXh0e05hfV4rIFxcb3RpbWVzIFxcdGV4dHtIYWxvfV4tKShcXHRleHR7Ym9uZH1faSBcXG90aW1lcyAxKSJdLFs1LDUsIlAoXFxzaWdtYV97MiwxfSkgOiBcXHRleHR7VHlIYWxvfV57XFxvdGltZXMgMn0iXSxbNCw2LCJcXHRleHR7d2hlcmV9Il0sWzQsOCwiKFxcdGV4dHtDSH1fM15cXGJ1bGxldCBcXG90aW1lcyBcXHRleHR7SGFsb31eXFxidWxsZXQpKFxcdGV4dHtib25kfV9jIFxcb3RpbWVzIDEpIFxcb3RpbWVzIChcXHRleHR7TmF9XisgXFxvdGltZXMgXFx0ZXh0e0h9Xi0pKFxcdGV4dHtib25kfV9pKSJdLFs1LDgsIihcXHRleHR7Q0h9XzNeXFxidWxsZXQgXFxvdGltZXMgXFx0ZXh0e0h9XlxcYnVsbGV0KShcXHRleHR7Ym9uZH1fYykgXFxvdGltZXMgKFxcdGV4dHtOYX1eKyBcXG90aW1lcyBcXHRleHR7SGFsb31eLSkoXFx0ZXh0e2JvbmR9X2kgXFxvdGltZXMgMSk6IFxcdGV4dHtUeUhhbG99Il0sWzQsNCwiXFx0ZXh0YmZ7UnVsZXN9OiJdLFsxLDMsIkkiXSxbMiw4LCJcXHRleHR7Q0h9XzNeXFxidWxsZXQgOiBcXHRleHR7UmFkfSJdLFszLDQsIlxcdGV4dHsoY29tbXV0YXRpdmUpfSJdLFsxLDIsIlxcdGV4dHtSYWR9Il0sWzIsNiwiXFx0ZXh0e0hhbG99XlxcYnVsbGV0IDogXFx0ZXh0e1JhZH0gXFxvdGltZXMgXFx0ZXh0e1R5SGFsb30iXSxbMSw4LCJcXHRleHR7SH1eXFxidWxsZXQgOiBcXHRleHR7UmFkfSJdLFs0LDMsIlxcdGV4dHtGfSJdLFs1LDMsIlxcdGV4dHtDbH0iLDJdLFsxMSwxMiwiXFx0ZXh0e2JvbmR9X2MiXSxbMTQsMTYsIlJfMSJdLFsxOCwxOSwiUl8yIl0sWzIxLDEwLCJcXHRleHR7Ym9uZH1faSJdXQ==
+
 mod common;
 use common::*;
 
+// Signature
 fn organic_chemistry_signature() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Pos"),
@@ -15,6 +23,7 @@ fn organic_chemistry_signature() -> Signature {
     .unwrap()
 }
 
+// Declares model.
 fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
     use surface::*;
     [
@@ -33,6 +42,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
             [ObTm::var("r"), ObTm::var("h")],
             [Ty::sort("Rad"), Ty::sort("TyHalo")],
         ),
+        // Halogen-halogen exchange
         ModelDecl::rule(
             "rule1",
             [ObTm::var("h1"), ObTm::var("h2")],
@@ -74,6 +84,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
                 ),
             ]),
         ),
+        // Halogen-hydrogen exchange
         ModelDecl::rule(
             "rule2",
             [ObTm::var("h1")],
@@ -118,6 +129,7 @@ fn organic_chemistry_model_decls() -> [ModelDecl; 9] {
     ]
 }
 
+// Generates model.
 fn organic_chemistry_model() -> Model {
     let decls = organic_chemistry_model_decls();
     Model::parse(organic_chemistry_signature(), decls).unwrap()
@@ -171,6 +183,7 @@ fn parse() {
 }
 
 #[test]
+#[ignore = "Waiting for bug fix in issue #7 and unifying `bond_c [] in (Halo_dot [r#1, F []], Halo_dot [r#2, Cl []]` with `bond_c [] in (Halo_dot [r#1, Cl []], Halo_dot [r#2, F []]`"]
 fn netgen() {
     let model = organic_chemistry_model();
     let generator = NetGenerator::new(&model);

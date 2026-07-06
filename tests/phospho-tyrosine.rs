@@ -1,6 +1,11 @@
+//! Sometimes, binding of one site to another is conditional on a modification pattern
+//! of one of the sites. A prominent example is binding of the SH2 domain to phosphorylated
+//! tyrosine residues, which is desribed by this test case
+
 mod common;
 use common::*;
 
+// Singature.
 fn phospho_tyrosine_signature() -> Signature {
     Signature::parse([
         SignatureDecl::sort("Tyr"),
@@ -15,6 +20,7 @@ fn phospho_tyrosine_signature() -> Signature {
     .unwrap()
 }
 
+// Declares model.
 fn phospho_tyrosine_model_decls() -> [ModelDecl; 4] {
     use surface::*;
     [
@@ -47,6 +53,7 @@ fn phospho_tyrosine_model_decls() -> [ModelDecl; 4] {
     ]
 } // TODO: Implement this model as preorder (currently `u` and `p` are parallel morphisms); will require enableing LHS and RHS mismatches for phosphorylation rule
 
+// Generates model.
 fn phospho_tyrosine_model() -> Model {
     let decls = phospho_tyrosine_model_decls();
     Model::parse(phospho_tyrosine_signature(), decls).unwrap()
