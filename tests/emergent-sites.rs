@@ -91,14 +91,6 @@ fn signature() -> Signature {
 // Declares Model.
 fn model_decl() -> [ModelDecl; 4] {
     use crate::surface::*;
-    let nt_r_ct = PatTm::res("M", [MorTm::var("i_aminoacid")]);
-    let nt_r_ct_nt_r_ct = PatTm::tensor([nt_r_ct.clone(), nt_r_ct.clone()]);
-    // @Evan: how to create this pattern?
-    let nt_r_cn_r_ct = nt_r_ct_nt_r_ct.restrict(
-        ObTm::tensor([ObTm::var("Ct"), ObTm::var("Nt")]),
-        MorTm::tensor([MorTm::var("bond_peptide"), MorTm::var("bond_peptide")]),
-    );
-    let nt_siter1r1_ct = nt_r_cn_r_ct.restrict(ObTm::var("CN"), MorTm::var("i_SiteR1R1"));
     let polymer = PatTm::let_(
         [ObTm::var("s1"), ObTm::var("s2")],
         MorTm::app("bond_peptide", [MorTm::var("cn")]),
@@ -131,14 +123,14 @@ fn model_decl() -> [ModelDecl; 4] {
                     "M",
                     [MorTm::app(
                         "i_aminoacid",
-                        [MorTm::var("n"), MorTm::var("r"), MorTm::var("e_C")],
+                        [MorTm::var("n"), MorTm::var("r"), MorTm::app("e_C", [])],
                     )],
                 ),
                 PatTm::res(
                     "M",
                     [MorTm::app(
                         "i_aminoacid",
-                        [MorTm::var("e_N"), MorTm::var("r"), MorTm::var("c")],
+                        [MorTm::app("e_N", []), MorTm::var("r"), MorTm::var("c")],
                     )],
                 ),
             ]),
@@ -225,7 +217,7 @@ fn parse_model() {
         #/ rules:
         [c, r, r', n, cn] : [Ct, R, R, Nt, CN] ⊢
           polymerization [c, r, r', n, cn]
-            : (M [i_aminoacid [n, r, e_C]], M [i_aminoacid [e_N, r, c]])
+            : (M [i_aminoacid [n, r, e_C []]], M [i_aminoacid [e_N [], r, c]])
             → let bond_peptide [cn] in
               (M [i_aminoacid [n, r, 0.0]], M [i_aminoacid [0.1, r', c]])
         [n, c] : [Nt, Ct] ⊢
@@ -245,7 +237,7 @@ fn parse_model() {
     expected.assert_eq(&model().to_string());
 }
 
-// Test that reaction fires in CellLine1.
+// Test that four dimerization and one polymerization reaction are created
 #[test]
 fn generate_network() {
     use itertools::Itertools;
@@ -285,8 +277,8 @@ fn generate_network() {
             polymerization [e_C [], i_R1 [0.0], i_R1 [0.2], e_N [], 0.1]
           : let i_SiteR1R1 [e_SiteR1R1 []] in
             (
-              M [i_aminoacid [e_N [], i_R1 [0.0], e_C]],
-              M [i_aminoacid [e_N, i_R1 [0.0], e_C []]]
+              M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]],
+              M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]]
             )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
             let bond_peptide [0.1] in
@@ -314,8 +306,8 @@ fn generate_network() {
               (
                 C [1.1],
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]]
                 )
               )
           → let bond [] in
@@ -338,12 +330,12 @@ fn generate_network() {
             let i_SiteR1R1 [e_SiteR1R1 []] in
               (
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]]
                 ),
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.2], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]]
                 )
               )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
@@ -370,12 +362,12 @@ fn generate_network() {
             let i_SiteR1R1 [e_SiteR1R1 []] in
               (
                 (
-                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [1.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]]
                 ),
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.2], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]]
                 )
               )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
@@ -402,12 +394,12 @@ fn generate_network() {
             let i_SiteR1R1 [e_SiteR1R1 []] in
               (
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]]
                 ),
                 (
-                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [1.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]]
                 )
               )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
@@ -434,12 +426,12 @@ fn generate_network() {
             let i_SiteR1R1 [e_SiteR1R1 []] in
               (
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.0], e_C []]]
                 ),
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.2], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]]
                 )
               )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
@@ -466,12 +458,12 @@ fn generate_network() {
             let i_SiteR1R1 [e_SiteR1R1 []] in
               (
                 (
-                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [1.0], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]]
                 ),
                 (
-                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C]],
-                  M [i_aminoacid [e_N, i_R1 [0.2], e_C []]]
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]],
+                  M [i_aminoacid [e_N [], i_R1 [0.2], e_C []]]
                 )
               )
           → let i_SiteR1R1 [e_SiteR1R1 []] in
