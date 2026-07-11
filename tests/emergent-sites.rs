@@ -21,7 +21,7 @@ fn base_signature() -> Signature {
         // Operations
         SignatureDecl::operation(
             "i_aminoacid",
-            [Ty::sort("Ct"), Ty::sort("R"), Ty::sort("Nt")],
+            [Ty::sort("Nt"), Ty::sort("R"), Ty::sort("Ct")],
             Ty::sort("TyMonomer"),
         ),
         SignatureDecl::operation("i_R1", [Ty::sort("R1")], Ty::sort("R")),
@@ -69,7 +69,7 @@ fn grounding_signature() -> Signature {
         SignatureDecl::operation("e_N", [], Ty::sort("Nt")),
         SignatureDecl::operation("e_C", [], Ty::sort("Ct")),
         SignatureDecl::operation("e_SiteR1R1", [], Ty::sort("SiteR1R1")),
-        SignatureDecl::operation("e_SitenotR1R1", [], Ty::sort("SiteNotR1R1")),
+        SignatureDecl::operation("e_SiteNotR1R1", [], Ty::sort("SiteNotR1R1")),
         SignatureDecl::operation("e_SiteC", [], Ty::sort("SiteC")),
         SignatureDecl::operation(
             // SiteR1R1 is an emergent site that can bind to SiteC
@@ -170,7 +170,7 @@ fn parse_signature() {
         SiteNotR1R1
         SiteC
         #/ operations:
-        i_aminoacid : [Ct, R, Nt] → TyMonomer
+        i_aminoacid : [Nt, R, Ct] → TyMonomer
         i_R1 : [R1] → R
         i_R2 : [R2] → R
         bond_peptide : [CN] → ⊗ [Ct, Nt]
@@ -200,7 +200,7 @@ fn parse_model() {
         SiteNotR1R1
         SiteC
         #/ operations:
-        i_aminoacid : [Ct, R, Nt] → TyMonomer
+        i_aminoacid : [Nt, R, Ct] → TyMonomer
         i_R1 : [R1] → R
         i_R2 : [R2] → R
         bond_peptide : [CN] → ⊗ [Ct, Nt]
@@ -249,26 +249,26 @@ fn generate_network() {
         let i_SiteR1R1 [e_SiteR1R1 []] in
           let bond_peptide [0.1] in
             (
-              M [i_aminoacid [e_C [], i_R1 [1.0], e_N []]],
-              M [i_aminoacid [0.0, i_R1 [1.2], 0.1]]
+              M [i_aminoacid [e_N [], i_R1 [1.0], e_C []]],
+              M [i_aminoacid [0.1, i_R1 [1.2], 0.0]]
             )
         let i_SiteR1R1 [e_SiteR1R1 []] in
           let bond_peptide [0.1] in
             (
-              M [i_aminoacid [e_C [], i_R1 [1.0], 0.1]],
-              M [i_aminoacid [0.0, i_R1 [1.2], e_N []]]
+              M [i_aminoacid [e_N [], i_R1 [1.0], 0.0]],
+              M [i_aminoacid [0.1, i_R1 [1.2], e_C []]]
             )
         let i_SiteR1R1 [e_SiteR1R1 []] in
           let bond_peptide [0.1] in
             (
-              M [i_aminoacid [0.0, i_R1 [1.0], e_N []]],
-              M [i_aminoacid [e_C [], i_R1 [1.2], 0.1]]
+              M [i_aminoacid [0.1, i_R1 [1.0], e_C []]],
+              M [i_aminoacid [e_N [], i_R1 [1.2], 0.0]]
             )
         let i_SiteR1R1 [e_SiteR1R1 []] in
           let bond_peptide [0.1] in
             (
-              M [i_aminoacid [0.0, i_R1 [1.0], 0.1]],
-              M [i_aminoacid [e_C [], i_R1 [1.2], e_N []]]
+              M [i_aminoacid [0.1, i_R1 [1.0], 0.0]],
+              M [i_aminoacid [e_N [], i_R1 [1.2], e_C []]]
             )"#]];
     species.assert_eq(&generator.species(2).join("\n"));
 
