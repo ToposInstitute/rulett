@@ -34,20 +34,22 @@ fn model_decl() -> [ModelDecl; 3] {
     // Define patterns
     let a_free = PatTm::res(
         "Agent",
-        MorTm::app("i_A", MorTm::tensor([MorTm::var("r"), MorTm::app("empty_A", [])])),
+        [MorTm::app("i_A", MorTm::tensor([MorTm::var("r"), MorTm::app("empty_A", [])]))],
     );
-    let b_free = PatTm::res("Agent", MorTm::app("i_B", MorTm::app("empty_B", [])));
-    let a_s1 =
-        PatTm::res("Agent", MorTm::app("i_A", MorTm::tensor([MorTm::var("r"), MorTm::var("s1")])));
-    let b_s2 = PatTm::res("Agent", MorTm::app("i_B", MorTm::var("s2")));
+    let b_free = PatTm::res("Agent", [MorTm::app("i_B", [MorTm::app("empty_B", [])])]);
+    let a_s1 = PatTm::res(
+        "Agent",
+        [MorTm::app("i_A", [MorTm::tensor([MorTm::var("r"), MorTm::var("s1")])])],
+    );
+    let b_s2 = PatTm::res("Agent", [MorTm::app("i_B", [MorTm::var("s2")])]);
     let ab = PatTm::let_(
         ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
         MorTm::app("bond", []),
         PatTm::tensor([a_s1, b_s2]),
     );
-    let a_unphos = PatTm::res("Agent", MorTm::app("i_A", MorTm::app("unphos", [])));
+    let a_unphos = PatTm::res("Agent", [MorTm::app("i_A", [MorTm::app("unphos", [])])]);
     let a_phos = a_unphos.subst(&mut vec![(name("unphos"), MorTm::var("phos"))]);
-    let k = PatTm::res("Agent", MorTm::app("i_K", []));
+    let k = PatTm::res("Agent", [MorTm::app("i_K", [])]);
 
     // Define rules
     let bond_ab = ModelDecl::rule(
@@ -116,12 +118,47 @@ fn parse_model() {
         #/ rules:
         [r] : [Res] ⊢
           bondAB [r]
-            : (Agent i_A (r, empty_A []), Agent i_B empty_B [])
-            → let bond [] in (Agent i_A (r, 0.0), Agent i_B 0.1)
+            : (Agent [i_A (r, empty_A [])], Agent [i_B [empty_B []]])
+            → let bond [] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
         [s] : [SiteA] ⊢
           phosphorylate [s]
-            : (Agent i_A unphos [], Agent i_K [])
-            → (Agent i_A unphos [], Agent i_K [])
+            : (Agent [i_A [unphos []]], Agent [i_K []])
+            → (Agent [i_A [unphos []]], Agent [i_K []])
     "#]];
     expected.assert_eq(&model().to_string());
+}
+
+#[test]
+fn generate_network() {
+    use itertools::Itertools;
+    let model = model();
+    let generator = NetGenerator::new(&model);
+
+    let species = expect![[r#"
+        Agent [i_A [phos [], empty_A []]]
+        Agent [i_A [unphos [], empty_A []]]
+        Agent [i_B [empty_B []]]
+        Agent [i_K []]
+        let bond_AB [] in (Agent [i_A [phos [], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [] in (Agent [i_A [unphos [], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [] in (Agent [i_B [0.1]], Agent [i_A [phos [], 0.0]])
+        let bond_AB [] in (Agent [i_B [0.1]], Agent [i_A [unphos [], 0.0]])"#]];
+    species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
+
+    let transitions = expect![[r#"
+        bondAB [phos []]
+          : (Agent [i_A (phos [], empty_A [])], Agent [i_B [empty_B []]])
+          → let bond [] in (Agent [i_A [(phos [], 0.0)]], Agent [i_B [0.1]])
+        bondAB [unphos []]
+          : (Agent [i_A (unphos [], empty_A [])], Agent [i_B [empty_B []]])
+          → let bond [] in (Agent [i_A [(unphos [], 0.0)]], Agent [i_B [0.1]])
+        phosphorylate [empty_A []]
+          : (Agent [i_A [unphos []]], Agent [i_K []])
+          → (Agent [i_A [unphos []]], Agent [i_K []])
+        let bond_AB [] in (Agent [i_B [0.1]], phosphorylate [0.0])
+          : let bond_AB [] in
+            (Agent [i_B [0.1]], (Agent [i_A [unphos []]], Agent [i_K []]))
+          → let bond_AB [] in
+            (Agent [i_B [0.1]], (Agent [i_A [unphos []]], Agent [i_K []]))"#]];
+    transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
