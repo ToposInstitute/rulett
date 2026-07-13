@@ -63,7 +63,6 @@ fn grounding_signature(skip_kinase: bool) -> Signature {
 /// Full signature.
 fn signature(skip_kinase: bool) -> Signature {
     let sig1 = main_signature();
-    println!("Skip Kinase: {skip_kinase}");
     let sig2 = grounding_signature(skip_kinase);
     merge_signatures(&[sig1, sig2])
 }
