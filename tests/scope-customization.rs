@@ -15,20 +15,20 @@ fn main_signature() -> Signature {
         // Separation layer to `[]`
         SignatureDecl::sort("S_k"),
         SignatureDecl::sort("S_b"),
-        SignatureDecl::sort("S_p"),
+        SignatureDecl::sort("S_a"),
         // Operations
         SignatureDecl::operation("i_A", [Ty::sort("Res"), Ty::sort("SiteA")], Ty::sort("TyAgent")),
         SignatureDecl::operation("i_B", [Ty::sort("SiteB")], Ty::sort("TyAgent")),
         SignatureDecl::operation("i_K", [Ty::sort("S_k")], Ty::sort("TyAgent")),
-        SignatureDecl::operation("empty_A", [Ty::sort("S_b")], Ty::sort("SiteA")),
+        SignatureDecl::operation("empty_A", [Ty::sort("S_a")], Ty::sort("SiteA")),
         SignatureDecl::operation("empty_B", [Ty::sort("S_b")], Ty::sort("SiteB")),
         SignatureDecl::operation(
             "bond_AB",
-            [Ty::sort("S_b")],
+            [Ty::tensor([Ty::sort("S_a"), Ty::sort("S_b")])],
             Ty::tensor([Ty::sort("SiteA"), Ty::sort("SiteB")]),
         ),
-        SignatureDecl::operation("phos", [Ty::sort("S_p")], Ty::sort("Res")),
-        SignatureDecl::operation("unphos", [Ty::sort("S_p")], Ty::sort("Res")),
+        SignatureDecl::operation("phos", [Ty::sort("S_a")], Ty::sort("Res")),
+        SignatureDecl::operation("unphos", [Ty::sort("S_a")], Ty::sort("Res")),
     ])
     .unwrap()
 }
@@ -39,19 +39,19 @@ fn grounding_signature(skip_kinase: bool) -> Signature {
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("S_k"),
         SignatureDecl::sort("S_b"),
-        SignatureDecl::sort("S_p"),
+        SignatureDecl::sort("S_a"),
         // Operations
         SignatureDecl::operation("!k", [], Ty::sort("S_k")),
         SignatureDecl::operation("!b", [], Ty::sort("S_b")),
-        SignatureDecl::operation("!p", [], Ty::sort("S_p")),
+        SignatureDecl::operation("!a", [], Ty::sort("S_a")),
     ];
     let d2 = [
         // Sorts (Separation layer to `[]`)
-        SignatureDecl::sort("S_b"),
-        SignatureDecl::sort("S_p"),
+        SignatureDecl::sort("S_k"),
+        SignatureDecl::sort("S_a"),
         // Operations
-        SignatureDecl::operation("!b", [], Ty::sort("S_b")),
-        SignatureDecl::operation("!p", [], Ty::sort("S_p")),
+        SignatureDecl::operation("!k", [], Ty::sort("S_k")),
+        SignatureDecl::operation("!a", [], Ty::sort("S_a")),
     ];
     if skip_kinase {
         Signature::parse(d2).unwrap()
@@ -78,7 +78,7 @@ fn model_decl() -> [ModelDecl; 3] {
         "Agent",
         [MorTm::app(
             "i_A",
-            [MorTm::tensor([MorTm::var("r"), MorTm::app("empty_A", [MorTm::var("b")])])],
+            [MorTm::tensor([MorTm::var("r"), MorTm::app("empty_A", [MorTm::var("a")])])],
         )],
     );
     let b_free =
@@ -101,8 +101,8 @@ fn model_decl() -> [ModelDecl; 3] {
     // Define rules
     let bond_ab = ModelDecl::rule(
         "bondAB",
-        [ObTm::var("r"), ObTm::var("b")],
-        [Ty::sort("Res"), Ty::sort("S_b")],
+        [ObTm::var("r"), ObTm::var("a"), ObTm::var("b")],
+        [Ty::sort("Res"), Ty::sort("S_a"), Ty::sort("S_b")],
         PatTm::tensor([a_free, b_free]),
         ab,
     ); // @Evan: here, we use the variable `b` twice on the lhs and twice on the rhs
@@ -133,19 +133,19 @@ fn parse_signature() {
         SiteB
         S_k
         S_b
-        S_p
+        S_a
         #/ operations:
         i_A : [Res, SiteA] → TyAgent
         i_B : [SiteB] → TyAgent
         i_K : [S_k] → TyAgent
-        empty_A : [S_b] → SiteA
+        empty_A : [S_a] → SiteA
         empty_B : [S_b] → SiteB
-        bond_AB : [S_b] → ⊗ [SiteA, SiteB]
-        phos : [S_p] → Res
-        unphos : [S_p] → Res
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
         !k : [] → S_k
         !b : [] → S_b
-        !p : [] → S_p
+        !a : [] → S_a
     "#]];
     expected.assert_eq(&signature(false).to_string());
 }
@@ -160,25 +160,25 @@ fn parse_model() {
         SiteB
         S_k
         S_b
-        S_p
+        S_a
         #/ operations:
         i_A : [Res, SiteA] → TyAgent
         i_B : [SiteB] → TyAgent
         i_K : [S_k] → TyAgent
-        empty_A : [S_b] → SiteA
+        empty_A : [S_a] → SiteA
         empty_B : [S_b] → SiteB
-        bond_AB : [S_b] → ⊗ [SiteA, SiteB]
-        phos : [S_p] → Res
-        unphos : [S_p] → Res
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
         !k : [] → S_k
         !b : [] → S_b
-        !p : [] → S_p
+        !a : [] → S_a
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [r, b] : [Res, S_b] ⊢
-          bondAB [r, b]
-            : (Agent [i_A [(r, empty_A [b])]], Agent [i_B [empty_B [b]]])
+        [r, a, b] : [Res, S_a, S_b] ⊢
+          bondAB [r, a, b]
+            : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
             → let bond_AB [b] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
         [s, k] : [SiteA, S_k] ⊢
           phosphorylate [s, k]
@@ -195,43 +195,47 @@ fn generate_network() {
     let generator = NetGenerator::new(&model);
 
     let species = expect![[r#"
-        Agent [i_A [phos [!p []], empty_A [!b []]]]
-        Agent [i_A [unphos [!p []], empty_A [!b []]]]
+        Agent [i_A [phos [!a []], empty_A [!a []]]]
+        Agent [i_A [unphos [!a []], empty_A [!a []]]]
         Agent [i_B [empty_B [!b []]]]
         Agent [i_K [!k []]]
-        let bond_AB [!b []] in (Agent [i_A [phos [!p []], 0.0]], Agent [i_B [0.1]])
-        let bond_AB [!b []] in (Agent [i_A [unphos [!p []], 0.0]], Agent [i_B [0.1]])
-        let bond_AB [!b []] in (Agent [i_B [0.1]], Agent [i_A [phos [!p []], 0.0]])
-        let bond_AB [!b []] in (Agent [i_B [0.1]], Agent [i_A [unphos [!p []], 0.0]])"#]];
+        let bond_AB [!a [], !b []] in
+          (Agent [i_A [phos [!a []], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_A [unphos [!a []], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_B [0.1]], Agent [i_A [phos [!a []], 0.0]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_B [0.1]], Agent [i_A [unphos [!a []], 0.0]])"#]];
     species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
-        bondAB [phos [!p []], !b []]
+        bondAB [phos [!a []], !a [], !b []]
           : (
-            Agent [i_A [(phos [!p []], empty_A [!b []])]],
+            Agent [i_A [(phos [!a []], empty_A [!a []])]],
             Agent [i_B [empty_B [!b []]]]
           )
           → let bond_AB [!b []] in
-            (Agent [i_A [(phos [!p []], 0.0)]], Agent [i_B [0.1]])
-        bondAB [unphos [!p []], !b []]
+            (Agent [i_A [(phos [!a []], 0.0)]], Agent [i_B [0.1]])
+        bondAB [unphos [!a []], !a [], !b []]
           : (
-            Agent [i_A [(unphos [!p []], empty_A [!b []])]],
+            Agent [i_A [(unphos [!a []], empty_A [!a []])]],
             Agent [i_B [empty_B [!b []]]]
           )
           → let bond_AB [!b []] in
-            (Agent [i_A [(unphos [!p []], 0.0)]], Agent [i_B [0.1]])
-        phosphorylate [empty_A [!b []], !k []]
+            (Agent [i_A [(unphos [!a []], 0.0)]], Agent [i_B [0.1]])
+        phosphorylate [empty_A [!a []], !k []]
           : (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])
           → (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])
-        let bond_AB [!b []] in (Agent [i_B [0.1]], phosphorylate [0.0, !k []])
-          : let bond_AB [!b []] in
+        let bond_AB [!a [], !b []] in (Agent [i_B [0.1]], phosphorylate [0.0, !k []])
+          : let bond_AB [!a [], !b []] in
             (Agent [i_B [0.1]], (Agent [i_A [unphos [p]]], Agent [i_K [!k []]]))
-          → let bond_AB [!b []] in
+          → let bond_AB [!a [], !b []] in
             (Agent [i_B [0.1]], (Agent [i_A [unphos [p]]], Agent [i_K [!k []]]))"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-// Without kinase
+// Without B
 #[test]
 fn parse_signature_no_kinase() {
     let expected = expect![[r#"
@@ -242,18 +246,18 @@ fn parse_signature_no_kinase() {
         SiteB
         S_k
         S_b
-        S_p
+        S_a
         #/ operations:
         i_A : [Res, SiteA] → TyAgent
         i_B : [SiteB] → TyAgent
         i_K : [S_k] → TyAgent
-        empty_A : [S_b] → SiteA
+        empty_A : [S_a] → SiteA
         empty_B : [S_b] → SiteB
-        bond_AB : [S_b] → ⊗ [SiteA, SiteB]
-        phos : [S_p] → Res
-        unphos : [S_p] → Res
-        !b : [] → S_b
-        !p : [] → S_p
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !k : [] → S_k
+        !a : [] → S_a
     "#]];
     expected.assert_eq(&signature(true).to_string());
 }
@@ -268,24 +272,24 @@ fn parse_model_no_kinase() {
         SiteB
         S_k
         S_b
-        S_p
+        S_a
         #/ operations:
         i_A : [Res, SiteA] → TyAgent
         i_B : [SiteB] → TyAgent
         i_K : [S_k] → TyAgent
-        empty_A : [S_b] → SiteA
+        empty_A : [S_a] → SiteA
         empty_B : [S_b] → SiteB
-        bond_AB : [S_b] → ⊗ [SiteA, SiteB]
-        phos : [S_p] → Res
-        unphos : [S_p] → Res
-        !b : [] → S_b
-        !p : [] → S_p
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !k : [] → S_k
+        !a : [] → S_a
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [r, b] : [Res, S_b] ⊢
-          bondAB [r, b]
-            : (Agent [i_A [(r, empty_A [b])]], Agent [i_B [empty_B [b]]])
+        [r, a, b] : [Res, S_a, S_b] ⊢
+          bondAB [r, a, b]
+            : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
             → let bond_AB [b] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
         [s, k] : [SiteA, S_k] ⊢
           phosphorylate [s, k]
@@ -302,29 +306,14 @@ fn generate_network_no_kinase() {
     let generator = NetGenerator::new(&model);
 
     let species = expect![[r#"
-        Agent [i_A [phos [!p []], empty_A [!b []]]]
-        Agent [i_A [unphos [!p []], empty_A [!b []]]]
-        Agent [i_B [empty_B [!b []]]]
-        let bond_AB [!b []] in (Agent [i_A [phos [!p []], 0.0]], Agent [i_B [0.1]])
-        let bond_AB [!b []] in (Agent [i_A [unphos [!p []], 0.0]], Agent [i_B [0.1]])
-        let bond_AB [!b []] in (Agent [i_B [0.1]], Agent [i_A [phos [!p []], 0.0]])
-        let bond_AB [!b []] in (Agent [i_B [0.1]], Agent [i_A [unphos [!p []], 0.0]])"#]];
+        Agent [i_A [phos [!a []], empty_A [!a []]]]
+        Agent [i_A [unphos [!a []], empty_A [!a []]]]
+        Agent [i_K [!k []]]"#]];
     species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
-        bondAB [phos [!p []], !b []]
-          : (
-            Agent [i_A [(phos [!p []], empty_A [!b []])]],
-            Agent [i_B [empty_B [!b []]]]
-          )
-          → let bond_AB [!b []] in
-            (Agent [i_A [(phos [!p []], 0.0)]], Agent [i_B [0.1]])
-        bondAB [unphos [!p []], !b []]
-          : (
-            Agent [i_A [(unphos [!p []], empty_A [!b []])]],
-            Agent [i_B [empty_B [!b []]]]
-          )
-          → let bond_AB [!b []] in
-            (Agent [i_A [(unphos [!p []], 0.0)]], Agent [i_B [0.1]])"#]];
+        phosphorylate [empty_A [!a []], !k []]
+          : (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])
+          → (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
