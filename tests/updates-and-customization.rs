@@ -64,10 +64,8 @@ fn model_decl() -> [ModelDecl; 3] {
     // Define patterns
     let a1 = PatTm::res("Agent", [MorTm::app("i_A", [MorTm::app("i_A1", [MorTm::var("s1")])])]);
     let a2 = PatTm::res("Agent", [MorTm::app("i_A", [MorTm::app("i_A2", [MorTm::var("s2")])])]);
-    let k1 =
-        PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K1", [MorTm::app("!K1", [])])])]);
-    let k2 =
-        PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K2", [MorTm::app("!K2", [])])])]);
+    let k1 = PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K1", [MorTm::var("k1")])])]);
+    let k2 = PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K2", [MorTm::var("k2")])])]);
     let a1_unphos = a1.subst(&mut vec![(name("s1"), MorTm::app("unphos_A1", []))]);
     let a2_unphos = a2.subst(&mut vec![(name("s2"), MorTm::app("unphos_A2", []))]);
     let a1_phos = a1.subst(&mut vec![(name("s1"), MorTm::app("phos_A1", []))]);
@@ -75,15 +73,15 @@ fn model_decl() -> [ModelDecl; 3] {
     // Define rules
     let phosphorylate_1 = ModelDecl::rule(
         "phosphorylate_1",
-        [],
-        [],
+        [ObTm::var("k1")],
+        [Ty::sort("SiteK1")],
         PatTm::tensor([a1_unphos, k1.clone()]),
         PatTm::tensor([a1_phos, k1]),
     );
     let phosphorylate_2 = ModelDecl::rule(
         "phosphorylate_2",
-        [],
-        [],
+        [ObTm::var("k2")],
+        [Ty::sort("SiteK2")],
         PatTm::tensor([a2_unphos, k2.clone()]),
         PatTm::tensor([a2_phos, k2]),
     );
@@ -151,14 +149,14 @@ fn parse_model() {
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [] : [] ⊢
-          phosphorylate_1 []
-            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-        [] : [] ⊢
-          phosphorylate_2 []
-            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
+        [k1] : [SiteK1] ⊢
+          phosphorylate_1 [k1]
+            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [k1]]])
+            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [k1]]])
+        [k2] : [SiteK2] ⊢
+          phosphorylate_2 [k2]
+            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [k2]]])
+            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [k2]]])
     "#]];
     expected.assert_eq(&model().to_string());
 }
@@ -179,10 +177,10 @@ fn generate_network() {
     species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
-        phosphorylate_1 []
+        phosphorylate_1 [!K1 []]
           : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
           → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-        phosphorylate_2 []
+        phosphorylate_2 [!K2 []]
           : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
           → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
@@ -208,11 +206,10 @@ fn model_decl_updated() -> [ModelDecl; 3] {
     // Define patterns
     let a1 = PatTm::res("Agent", [MorTm::app("i_A", [MorTm::app("i_A1", [MorTm::var("s1")])])]);
     let a2 = PatTm::res("Agent", [MorTm::app("i_A", [MorTm::app("i_A2", [MorTm::var("s2")])])]);
-    let k = PatTm::res("Agent", [MorTm::app("i_K", [MorTm::var("s3")])]);
+    let k = PatTm::res("Agent", [MorTm::app("i_K", [MorTm::var("k")])]);
     // let k1 =
     // PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K1", [MorTm::app("!K1", [])])])]);
-    let k2 =
-        PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K2", [MorTm::app("!K2", [])])])]);
+    let k2 = PatTm::res("Agent", [MorTm::app("i_K", [MorTm::app("i_K2", [MorTm::var("k2")])])]);
     let a1_unphos = a1.subst(&mut vec![(name("s1"), MorTm::app("unphos_A1", []))]);
     let a2_unphos = a2.subst(&mut vec![(name("s2"), MorTm::app("unphos_A2", []))]);
     let a1_phos = a1.subst(&mut vec![(name("s1"), MorTm::app("phos_A1", []))]);
@@ -220,15 +217,15 @@ fn model_decl_updated() -> [ModelDecl; 3] {
     // Define rules
     let phosphorylate_1 = ModelDecl::rule(
         "phosphorylate_1",
-        [ObTm::var("s3")],
+        [ObTm::var("k")],
         [Ty::sort("SiteK")],
         PatTm::tensor([a1_unphos, k.clone()]),
         PatTm::tensor([a1_phos, k]),
     );
     let phosphorylate_2 = ModelDecl::rule(
         "phosphorylate_2",
-        [],
-        [],
+        [ObTm::var("k2")],
+        [Ty::sort("SiteK2")],
         PatTm::tensor([a2_unphos, k2.clone()]),
         PatTm::tensor([a2_phos, k2]),
     );
@@ -267,14 +264,14 @@ fn parse_model_updated() {
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [s3] : [SiteK] ⊢
-          phosphorylate_1 [s3]
-            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [s3])
-            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [s3])
-        [] : [] ⊢
-          phosphorylate_2 []
-            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
+        [k] : [SiteK] ⊢
+          phosphorylate_1 [k]
+            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [k]])
+            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [k]])
+        [k2] : [SiteK2] ⊢
+          phosphorylate_2 [k2]
+            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [k2]]])
+            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [k2]]])
     "#]];
     expected.assert_eq(&model_updated().to_string());
 }
@@ -301,7 +298,7 @@ fn generate_network_updated() {
         phosphorylate_1 [i_K2 [!K2 []]]
           : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K2 [!K2 []]]])
           → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K2 [!K2 []]]])
-        phosphorylate_2 []
+        phosphorylate_2 [!K2 []]
           : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
           → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
@@ -365,14 +362,14 @@ fn parse_model_updated_coproduct() {
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [s3] : [SiteK] ⊢
-          phosphorylate_1 [s3]
-            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [s3]])
-            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [s3]])
-        [] : [] ⊢
-          phosphorylate_2 []
-            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
+        [k] : [SiteK] ⊢
+          phosphorylate_1 [k]
+            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [k]])
+            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [k]])
+        [k2] : [SiteK2] ⊢
+          phosphorylate_2 [k2]
+            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [k2]]])
+            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [k2]]])
     "#]];
     expected.assert_eq(&model_updated_coproduct().to_string());
 }
@@ -394,10 +391,7 @@ fn generate_network_updated_coproduct() {
     let transitions = expect![[r#"
         phosphorylate_1 [!K []]
           : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [!K []]])
-          → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [!K []]])
-        phosphorylate_2 []
-          : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-          → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])"#]];
+          → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [!K []]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
@@ -466,14 +460,14 @@ fn parse_model_product() {
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
-        [] : [] ⊢
-          phosphorylate_1 []
-            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-        [] : [] ⊢
-          phosphorylate_2 []
-            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
+        [k1] : [SiteK1] ⊢
+          phosphorylate_1 [k1]
+            : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [k1]]])
+            → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [k1]]])
+        [k2] : [SiteK2] ⊢
+          phosphorylate_2 [k2]
+            : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [k2]]])
+            → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [k2]]])
     "#]];
     expected.assert_eq(&model_product().to_string());
 }
@@ -494,11 +488,11 @@ fn generate_network_product() {
     species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
-        phosphorylate_1 []
-          : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-          → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [!K1 []]]])
-        phosphorylate_2 []
-          : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])
-          → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [!K2 []]]])"#]];
+        phosphorylate_1 [i_K*1 [!K* []]]
+          : (Agent [i_A [i_A1 [unphos_A1 []]]], Agent [i_K [i_K1 [i_K*1 [!K* []]]]])
+          → (Agent [i_A [i_A1 [phos_A1 []]]], Agent [i_K [i_K1 [i_K*1 [!K* []]]]])
+        phosphorylate_2 [i_K*2 [!K* []]]
+          : (Agent [i_A [i_A2 [unphos_A2 []]]], Agent [i_K [i_K2 [i_K*2 [!K* []]]]])
+          → (Agent [i_A [i_A2 [phos_A2 []]]], Agent [i_K [i_K2 [i_K*2 [!K* []]]]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
