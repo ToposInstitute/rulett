@@ -8,7 +8,7 @@
 //! define environments as shown
 //! [here](https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiVHlBQiJdLFsxLDIsIlR5QUMiXSxbMiwyLCJUeUJDIl0sWzEsMywiVHlBQkMiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=)
 //! or, using more suggestive labelling,
-//! [here](https://q.uiver.app/#q=WzAsOCxbMSwwLCJUeU1vbGVjdWxlIl0sWzAsMSwiVHlBIl0sWzEsMSwiVHlCIl0sWzIsMSwiVHlDIl0sWzAsMiwiQ2VsbFgiXSxbMSwyLCJDZWxsWSJdLFsyLDIsIkNlbGxaIl0sWzEsMywiQ2VsbE9tbmlwb3RlbnQiXSxbMSwwXSxbMiwwXSxbMywwXSxbNCwxXSxbNSwxXSxbNCwyXSxbNiwyXSxbNSwzXSxbNiwzXSxbNyw0XSxbNyw1XSxbNyw2XV0=)
+//! [here](https://q.uiver.app/#q=WzAsOCxbMSwwLCJcXG1hdGhybXtUeU1vbGVjdWxlfSJdLFswLDEsIlxcbWF0aHJte1R5QX0iXSxbMSwxLCJcXG1hdGhybXtUeUJ9Il0sWzIsMSwiXFxtYXRocm17VHlDfSJdLFswLDIsIlxcbWF0aHJte0NlbGxYfSJdLFsxLDIsIlxcbWF0aHJte0NlbGxZfSJdLFsyLDIsIlxcbWF0aHJte0NlbGxafSJdLFsxLDMsIlxcbWF0aHJte0NlbGxPbW5pcG90ZW50fSJdLFsxLDBdLFsyLDBdLFszLDBdLFs0LDFdLFs1LDFdLFs0LDJdLFs2LDJdLFs1LDNdLFs2LDNdLFs3LDRdLFs3LDVdLFs3LDZdXQ==)
 //!
 //! I.e. an environment is a capability that combines the capabilities of its underlying species.
 //!
