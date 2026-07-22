@@ -1,4 +1,11 @@
-//! https://q.uiver.app/#q=WzAsNDIsWzEsMSwiUmVzIFxcb3RpbWVzIFNpdGVBIl0sWzIsMSwiU2l0ZUIiXSxbMiwwLCJUeUFnZW50Il0sWzYsMCwiU2l0ZUEgXFxvdGltZXMgU2l0ZUIiXSxbNSwyLCJJIl0sWzMsMiwiSSJdLFs0LDAsIlNpdGVBIl0sWzUsMCwiU2l0ZUIiXSxbNywwLCJSZXMiXSxbNywyLCJJIl0sWzEsNSwiUmVzIFxcb3RpbWVzIFNpdGVBIl0sWzIsNSwiU2l0ZUIiXSxbMiw0LCJUeUFnZW50Il0sWzYsNCwiU2l0ZUEgXFxvdGltZXMgU2l0ZUIiXSxbNSw1LCJTX2IiXSxbMyw1LCJTX2siXSxbNCw0LCJTaXRlQSJdLFs1LDQsIlNpdGVCIl0sWzcsNCwiUmVzIl0sWzcsNSwiU19wIl0sWzMsNiwiSSJdLFs1LDYsIkkiXSxbNyw2LCJJIl0sWzEsOSwiU2l0ZUEiXSxbMiw5LCJTaXRlQiJdLFsyLDgsIlR5QWdlbnQiXSxbOCw4LCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIxIl0sWzYsMTAsIlNfYiJdLFs1LDgsIlNpdGVBIl0sWzYsOCwiU2l0ZUIiXSxbNiwxMSwiSSJdLFs0LDksIlNpdGVBMSJdLFs1LDksIlNpdGVBMiJdLFs2LDksIlNpdGVCMSJdLFs3LDksIlNpdGVCMiJdLFs5LDgsIlNpdGVBMiBcXG90aW1lcyBTaXRlQjIiXSxbOCwxMCwiU197YjF9Il0sWzksMTAsIlNfe2IyfSJdLFswLDEwLCJTaXRlQTEiXSxbMSwxMCwiU2l0ZUEyIl0sWzIsMTAsIlNpdGVCMSJdLFszLDEwLCJTaXRlQjIiXSxbNSwyLCJcXGlvdGFfSyIsMl0sWzQsNywiZW1wdHlfQiIsMV0sWzksOCwicGhvcyIsMCx7ImN1cnZlIjotMX1dLFs0LDYsImVtcHR5X0EiXSxbNCwzLCJib25kX3tBQn0iLDJdLFswLDIsIlxcaW90YV9BIiwyXSxbMSwyLCJcXGlvdGFfQiIsMl0sWzE1LDEyXSxbMTQsMTcsImVtcHR5X0IiLDFdLFsxOSwxOCwicCIsMCx7ImN1cnZlIjotMX1dLFsxNCwxNiwiZW1wdHlfQSJdLFsxNCwxMywiYm9uZF97QUJ9IiwyXSxbMTAsMTJdLFsxMSwxMl0sWzIwLDE1XSxbMjEsMTRdLFsyMiwxOV0sWzksOCwidW5waG9zIiwyLHsiY3VydmUiOjF9XSxbMTksMTgsInUiLDIseyJjdXJ2ZSI6MX1dLFsyMywyNV0sWzI0LDI1XSxbMzAsMjddLFszMSwyOF0sWzI3LDMxLCJlbXB0eV9BIl0sWzMyLDI4XSxbMjcsMzJdLFszNCwyOV0sWzI3LDMzLCJlbXB0eV9CIiwxXSxbMzMsMjldLFsyNywzNF0sWzM2LDI2XSxbMzcsMzVdLFszOCwyM10sWzM5LDIzXSxbNDAsMjRdLFs0MSwyNF1d
+//! This example shows how we can customize the scope of our vanilla association-phosphorylation model.
+//! This is done by introducing a separation layer between our previous sites and []. In particular,
+//! we choose one separation sort for each of the agents A, B and K. Each site on agent X is connected
+//! to separation sort S_x through a morphism descriping the state of the site. For example: `phos: S_a -> Res`.
+//! Users can then select which agents X should be part of the generated reaction network by defining
+//! a unique morphism !x: [] -> S_x. Note that this approach assumes that sites are not shared across agents.
+//!
+//! https://q.uiver.app/#q=WzAsMTQsWzEsMCwiXFxtYXRocm17VHlBZ2VudH0iXSxbMCwxLCJcXG1hdGhybXtTaXRlQX0gXFxvdGltZXMgXFxtYXRocm17UmVzfSJdLFsxLDEsIlxcbWF0aHJte1NpdGVCfSJdLFsyLDEsIlNfayJdLFszLDAsIlxcbWF0aHJte1NpdGVBfSJdLFs0LDAsIlxcbWF0aHJte1NpdGVCfSJdLFs1LDAsIlxcbWF0aHJte1NpdGVBfSBcXG90aW1lcyBcXG1hdGhybXtTaXRlQn0iXSxbNiwwLCJcXG1hdGhybXtSZXN9Il0sWzMsMSwiU19hIl0sWzYsMSwiU19hIl0sWzAsMCwiXFxtYXRoc2Z7VH0iXSxbNCwxLCJTX2IiXSxbNSwxLCJTX2EgXFxvdGltZXMgU19iIl0sWzMsMiwiSSJdLFsxLDAsIlxcaW90YV9BIl0sWzIsMCwiXFxpb3RhX0IiLDJdLFszLDAsIlxcaW90YV9LIiwyXSxbOSw3LCJcXG1hdGhybXtwaG9zfSIsMCx7ImN1cnZlIjotMX1dLFs5LDcsIlxcbWF0aHJte3VucGhvc30iLDIseyJjdXJ2ZSI6MX1dLFs4LDQsIlxcbWF0aHJte2VtcHR5X0F9IiwxXSxbMTEsNSwiXFxtYXRocm17ZW1wdHlfQn0iLDFdLFsxMiw2LCJcXG1hdGhybXtib25kX3tBQn19IiwxXSxbMTMsMywiIWsiXSxbMTMsOCwiIWEiLDFdLFsxMywxMSwiIWIiLDIseyJjb2xvdXIiOlswLDAsNTBdfSxbMCwwLDUwLDFdXV0=
 
 mod common;
 use common::*;
@@ -34,7 +41,7 @@ fn main_signature() -> Signature {
 }
 
 /// Grounding signature.
-fn grounding_signature(skip_kinase: bool) -> Signature {
+fn grounding_signature(skip_b: bool) -> Signature {
     let d1 = [
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("S_k"),
@@ -53,7 +60,7 @@ fn grounding_signature(skip_kinase: bool) -> Signature {
         SignatureDecl::operation("!k", [], Ty::sort("S_k")),
         SignatureDecl::operation("!a", [], Ty::sort("S_a")),
     ];
-    if skip_kinase {
+    if skip_b {
         Signature::parse(d2).unwrap()
     } else {
         Signature::parse(d1).unwrap()
@@ -61,9 +68,9 @@ fn grounding_signature(skip_kinase: bool) -> Signature {
 }
 
 /// Full signature.
-fn signature(skip_kinase: bool) -> Signature {
+fn signature(skip_b: bool) -> Signature {
     let sig1 = main_signature();
-    let sig2 = grounding_signature(skip_kinase);
+    let sig2 = grounding_signature(skip_b);
     merge_signatures(&[sig1, sig2])
 }
 
@@ -90,7 +97,7 @@ fn model_decl() -> [ModelDecl; 3] {
     let b_s2 = PatTm::res("Agent", [MorTm::app("i_B", [MorTm::var("s2")])]);
     let ab = PatTm::let_(
         ObTm::tensor([ObTm::var("s1"), ObTm::var("s2")]),
-        MorTm::app("bond_AB", [MorTm::var("b")]),
+        MorTm::app("bond_AB", [MorTm::tensor([MorTm::var("a"), MorTm::var("b")])]),
         PatTm::tensor([a_s1, b_s2]),
     );
     let a_unphos =
@@ -105,7 +112,7 @@ fn model_decl() -> [ModelDecl; 3] {
         [Ty::sort("Res"), Ty::sort("S_a"), Ty::sort("S_b")],
         PatTm::tensor([a_free, b_free]),
         ab,
-    ); // @Evan: here, we use the variable `b` twice on the lhs and twice on the rhs
+    ); // @Evan: here, we use the variable `a` once on the lhs and once on the rhs. Ditto for `b`. Linearity means once per pattern, not once per rule, right?
     let phosphorylate = ModelDecl::rule(
         "phosphorylate",
         [ObTm::var("s"), ObTm::var("k")],
@@ -117,12 +124,12 @@ fn model_decl() -> [ModelDecl; 3] {
 }
 
 // Generates Model.
-fn model(skip_kinase: bool) -> Model {
+fn model(skip_b: bool) -> Model {
     let decls = model_decl();
-    Model::parse(signature(skip_kinase), decls).unwrap()
+    Model::parse(signature(skip_b), decls).unwrap()
 }
 
-// With kinase
+// With B
 #[test]
 fn parse_signature() {
     let expected = expect![[r#"
@@ -179,7 +186,7 @@ fn parse_model() {
         [r, a, b] : [Res, S_a, S_b] ⊢
           bondAB [r, a, b]
             : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
-            → let bond_AB [b] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
+            → let bond_AB [(a, b)] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
         [s, k] : [SiteA, S_k] ⊢
           phosphorylate [s, k]
             : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
@@ -215,14 +222,14 @@ fn generate_network() {
             Agent [i_A [(phos [!a []], empty_A [!a []])]],
             Agent [i_B [empty_B [!b []]]]
           )
-          → let bond_AB [!b []] in
+          → let bond_AB [(!a [], !b [])] in
             (Agent [i_A [(phos [!a []], 0.0)]], Agent [i_B [0.1]])
         bondAB [unphos [!a []], !a [], !b []]
           : (
             Agent [i_A [(unphos [!a []], empty_A [!a []])]],
             Agent [i_B [empty_B [!b []]]]
           )
-          → let bond_AB [!b []] in
+          → let bond_AB [(!a [], !b [])] in
             (Agent [i_A [(unphos [!a []], 0.0)]], Agent [i_B [0.1]])
         phosphorylate [empty_A [!a []], !k []]
           : (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])
@@ -290,7 +297,7 @@ fn parse_model_no_kinase() {
         [r, a, b] : [Res, S_a, S_b] ⊢
           bondAB [r, a, b]
             : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
-            → let bond_AB [b] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
+            → let bond_AB [(a, b)] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
         [s, k] : [SiteA, S_k] ⊢
           phosphorylate [s, k]
             : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
@@ -309,7 +316,7 @@ fn generate_network_no_kinase() {
         Agent [i_A [phos [!a []], empty_A [!a []]]]
         Agent [i_A [unphos [!a []], empty_A [!a []]]]
         Agent [i_K [!k []]]"#]];
-    species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
+    species.assert_eq(&generator.species(2).join("\n"));
 
     let transitions = expect![[r#"
         phosphorylate [empty_A [!a []], !k []]
