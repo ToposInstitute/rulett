@@ -1,3 +1,8 @@
+//! This example shows how to
+//! - generalize knowledge (shift a rule to a higher level of abstraction)
+//! - coarse grain models through coproducts (use point to higher level rules)
+//! - coarse grain models through products (not working yet - requires equality contraints)
+//!
 //! https://q.uiver.app/#q=WzAsNDIsWzEsMSwiUmVzIFxcb3RpbWVzIFNpdGVBIl0sWzIsMSwiU2l0ZUIiXSxbMiwwLCJUeUFnZW50Il0sWzYsMCwiU2l0ZUEgXFxvdGltZXMgU2l0ZUIiXSxbNSwyLCJJIl0sWzMsMiwiSSJdLFs0LDAsIlNpdGVBIl0sWzUsMCwiU2l0ZUIiXSxbNywwLCJSZXMiXSxbNywyLCJJIl0sWzEsNSwiUmVzIFxcb3RpbWVzIFNpdGVBIl0sWzIsNSwiU2l0ZUIiXSxbMiw0LCJUeUFnZW50Il0sWzYsNCwiU2l0ZUEgXFxvdGltZXMgU2l0ZUIiXSxbNSw1LCJTX2IiXSxbMyw1LCJTX2siXSxbNCw0LCJTaXRlQSJdLFs1LDQsIlNpdGVCIl0sWzcsNCwiUmVzIl0sWzcsNSwiU19wIl0sWzMsNiwiSSJdLFs1LDYsIkkiXSxbNyw2LCJJIl0sWzEsOSwiU2l0ZUEiXSxbMiw5LCJTaXRlQiJdLFsyLDgsIlR5QWdlbnQiXSxbOCw4LCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIxIl0sWzYsMTAsIlNfYiJdLFs1LDgsIlNpdGVBIl0sWzYsOCwiU2l0ZUIiXSxbNiwxMSwiSSJdLFs0LDksIlNpdGVBMSJdLFs1LDksIlNpdGVBMiJdLFs2LDksIlNpdGVCMSJdLFs3LDksIlNpdGVCMiJdLFs5LDgsIlNpdGVBMiBcXG90aW1lcyBTaXRlQjIiXSxbOCwxMCwiU197YjF9Il0sWzksMTAsIlNfe2IyfSJdLFswLDEwLCJTaXRlQTEiXSxbMSwxMCwiU2l0ZUEyIl0sWzIsMTAsIlNpdGVCMSJdLFszLDEwLCJTaXRlQjIiXSxbNSwyLCJcXGlvdGFfSyIsMl0sWzQsNywiZW1wdHlfQiIsMV0sWzksOCwicGhvcyIsMCx7ImN1cnZlIjotMX1dLFs0LDYsImVtcHR5X0EiXSxbNCwzLCJib25kX3tBQn0iLDJdLFswLDIsIlxcaW90YV9BIiwyXSxbMSwyLCJcXGlvdGFfQiIsMl0sWzE1LDEyXSxbMTQsMTcsImVtcHR5X0IiLDFdLFsxOSwxOCwicCIsMCx7ImN1cnZlIjotMX1dLFsxNCwxNiwiZW1wdHlfQSJdLFsxNCwxMywiYm9uZF97QUJ9IiwyXSxbMTAsMTJdLFsxMSwxMl0sWzIwLDE1XSxbMjEsMTRdLFsyMiwxOV0sWzksOCwidW5waG9zIiwyLHsiY3VydmUiOjF9XSxbMTksMTgsInUiLDIseyJjdXJ2ZSI6MX1dLFsyMywyNV0sWzI0LDI1XSxbMzAsMjddLFszMSwyOF0sWzI3LDMxLCJlbXB0eV9BIl0sWzMyLDI4XSxbMjcsMzJdLFszNCwyOV0sWzI3LDMzLCJlbXB0eV9CIiwxXSxbMzMsMjldLFsyNywzNF0sWzM2LDI2XSxbMzcsMzVdLFszOCwyM10sWzM5LDIzXSxbNDAsMjRdLFs0MSwyNF1d
 
 mod common;
@@ -28,9 +33,9 @@ fn main_signature() -> Signature {
     .unwrap()
 }
 
-/// Grounding signature.
-fn grounding_signature_1() -> Signature {
-    let d1 = [
+/// Grounding signature
+fn grounding_signature() -> Signature {
+    let d = [
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("SiteA"),
         SignatureDecl::sort("SiteA1"),
@@ -45,13 +50,13 @@ fn grounding_signature_1() -> Signature {
         SignatureDecl::operation("!K1", [], Ty::sort("SiteK1")),
         SignatureDecl::operation("!K2", [], Ty::sort("SiteK2")),
     ];
-    Signature::parse(d1).unwrap()
+    Signature::parse(d).unwrap()
 }
 
 /// Full signature.
 fn signature() -> Signature {
     let sig1 = main_signature();
-    let sig2 = grounding_signature_1();
+    let sig2 = grounding_signature();
     merge_signatures(&[sig1, sig2])
 }
 
@@ -186,16 +191,19 @@ fn generate_network() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-/// --- Model update: A1 can be phosphorylated also by K2 --- ///
+/// --- Model update: A1 can be phosphorylated also by any K --- ///
 
-// TODO: Get this to work for A2 can be phosphorylated also by K1. The problem here is, that this would require a morphism
+// TODO: Get this to work for "K2 phosphorylates any A". The first problem here is, that this would require a morphism
 // `phos: I -> SiteA` instead of `phos: I -> SiteA1`. But without `phos: I -> SiteA1` you can no longer generate the fine-grained
 // reaction. This problem may be similar to
 // [**Generalized expression**](https://github.com/ToposInstitute/sys-bio-collab/blob/441abbf2359fbd0fe45c99ad4e5a1ef617ccc393/notes/examples/Incremental%20Examples.md?plain=1#L15):
 // there we want to turn Gene_i to Protein_i for all possible i. Here, we want to turn A_i to phosphoA_i for all possible i.
-// Once this is fixed, try to see if this also works for binding reactions (A1 binds to B, A2 binds to B2). The added complexity
-// here is that we have a bond going to the tensor product SiteA1 ⊗ SiteB:
-// https://q.uiver.app/#q=WzAsNCxbMSwwLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIiXSxbMCwxLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIxIl0sWzIsMSwiU2l0ZUExIFxcb3RpbWVzIFNpdGVCMiJdLFsxLDIsIkkiXSxbMSwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjF9IiwxXSxbMiwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjJ9IiwxXSxbMywxLCJib25kX3sxMX0iLDFdLFszLDIsImJvbmRfezEyfSIsMV1d
+// Once this is fixed,
+// - Make sure we don't get the reaction K2 phosphorylates A1 twice (once for "any K phosphorylates A1", once for "K2 phosphorylates any A")
+// - try to see if this also works for binding reactions (A1 binds to B, A2 binds to B2). The added complexity
+// here is that we have a bond going to the tensor product SiteA1 ⊗ SiteB; but we cannot use this path, because it won't expand
+// to SiteB1 and SiteB2 separately.
+// https://q.uiver.app/#q=WzAsNCxbMSwwLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIiXSxbMCwxLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIxIl0sWzIsMSwiU2l0ZUExIFxcb3RpbWVzIFNpdGVCMiJdLFsxLDIsIkkiXSxbMSwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjF9IiwxXSxbMiwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjJ9IiwxXSxbMywxLCJib25kX3sxMX0iLDFdLFszLDIsImJvbmRfezEyfSIsMV0sWzMsMCwiYm9uZCIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dXQ==
 
 // Knowledge update (generalization)
 fn model_decl_updated() -> [ModelDecl; 3] {
@@ -307,8 +315,8 @@ fn generate_network_updated() {
 /// --- Coarse graining (coproduct) --- ///
 
 // Coarse grained signature
-fn grounding_signature_2() -> Signature {
-    let d1 = [
+fn grounding_signature_coproduct() -> Signature {
+    let d = [
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("SiteA"),
         SignatureDecl::sort("SiteA1"),
@@ -321,13 +329,13 @@ fn grounding_signature_2() -> Signature {
         SignatureDecl::operation("phos_A2", [], Ty::sort("SiteA2")),
         SignatureDecl::operation("!K", [], Ty::sort("SiteK")),
     ];
-    Signature::parse(d1).unwrap()
+    Signature::parse(d).unwrap()
 }
 
 /// Full signature.
 fn signature_coproduct() -> Signature {
     let sig1 = main_signature();
-    let sig2 = grounding_signature_2();
+    let sig2 = grounding_signature_coproduct();
     merge_signatures(&[sig1, sig2])
 }
 
@@ -398,8 +406,8 @@ fn generate_network_updated_coproduct() {
 /// --- Coarse graining (product) --- ///
 
 // Coarse grained signature
-fn grounding_signature_3() -> Signature {
-    let d1 = [
+fn grounding_signature_product() -> Signature {
+    let d = [
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("SiteA"),
         SignatureDecl::sort("SiteA1"),
@@ -416,13 +424,13 @@ fn grounding_signature_3() -> Signature {
         SignatureDecl::operation("i_K*2", [Ty::sort("SiteK*")], Ty::sort("SiteK2")),
         SignatureDecl::operation("!K*", [], Ty::sort("SiteK*")),
     ];
-    Signature::parse(d1).unwrap()
+    Signature::parse(d).unwrap()
 }
 
 /// Full signature.
 fn signature_product() -> Signature {
     let sig1 = main_signature();
-    let sig2 = grounding_signature_3();
+    let sig2 = grounding_signature_product();
     merge_signatures(&[sig1, sig2])
 }
 
