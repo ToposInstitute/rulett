@@ -1,4 +1,8 @@
-// https://q.uiver.app/#q=WzAsNyxbMSwwLCJTaXRlQSBcXG90aW1lcyBTaXRlQiJdLFsxLDEsIlNpdGVBQiJdLFsxLDIsIkkiXSxbMCwyLCJTaXRlQSJdLFsyLDIsIlNpdGVCIl0sWzMsMCwiU2l0ZUFCIFxcb3RpbWVzIFNpdGVDIl0sWzMsMiwiSSJdLFsxLDAsImJvbmRfe0F0b0J9Il0sWzIsMSwiZW1wdHlfe0FCfSJdLFsyLDMsImVtcHR5X0EiLDJdLFsyLDQsImVtcHR5X0IiLDJdLFs2LDUsImJvbmRfe0FCdG9DfSIsMl1d
+//! This example illustrates how bonding of A to B creates a new, "emergent" site that can bind to another agent C.
+//! Additionally, we show "molecular coarse graining": we replace the "atomic" SiteA and SiteB (think monomers) with a
+//! by removing the morphisms i_A: SiteA -> TyAgent and i_B: SiteB -> TyAgent via a morphism i_AB: SiteAB -> TyAgent.
+//!
+//! https://q.uiver.app/#q=WzAsNyxbMSwwLCJTaXRlQSBcXG90aW1lcyBTaXRlQiJdLFsxLDEsIlNpdGVBQiJdLFsxLDIsIkkiXSxbMCwyLCJTaXRlQSJdLFsyLDIsIlNpdGVCIl0sWzMsMCwiU2l0ZUFCIFxcb3RpbWVzIFNpdGVDIl0sWzMsMiwiSSJdLFsxLDAsImJvbmRfe0F0b0J9Il0sWzIsMSwiZW1wdHlfe0FCfSJdLFsyLDMsImVtcHR5X0EiLDJdLFsyLDQsImVtcHR5X0IiLDJdLFs2LDUsImJvbmRfe0FCdG9DfSIsMl1d
 
 mod common;
 use common::*;
@@ -99,7 +103,7 @@ fn parse_signature() {
         empty_C : [] → SiteC
         empty_AB : [] → SiteAB
         bond_AtoB : [SiteAB] → ⊗ [SiteA, SiteB]
-        bond_ABtoC : [] → ⊗ [SiteAB, SiteC]
+        bond_ABtoC : [] → ⊗ [SiteC, SiteAB]
     "#]];
     expected.assert_eq(&signature().to_string());
 }
@@ -122,7 +126,7 @@ fn parse_model() {
         empty_C : [] → SiteC
         empty_AB : [] → SiteAB
         bond_AtoB : [SiteAB] → ⊗ [SiteA, SiteB]
-        bond_ABtoC : [] → ⊗ [SiteAB, SiteC]
+        bond_ABtoC : [] → ⊗ [SiteC, SiteAB]
         #/ agents:
         [a] : [TyAgent] ⊢ Agent [a]
         #/ rules:
@@ -153,14 +157,31 @@ fn generate_network() {
     let model = model();
     let generator = NetGenerator::new(&model);
 
-    // @Evan: any idea why we don't get a trimer here?
     let species = expect![[r#"
         Agent [i_A [empty_A []]]
         Agent [i_B [empty_B []]]
         Agent [i_C [empty_C []]]
         let bond_AtoB [empty_AB []] in (Agent [i_A [0.0]], Agent [i_B [0.1]])
-        let bond_AtoB [empty_AB []] in (Agent [i_B [0.1]], Agent [i_A [0.0]])"#]];
-    species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
+        let bond_AtoB [empty_AB []] in (Agent [i_B [0.1]], Agent [i_A [0.0]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_A [0.0]], Agent [i_B [0.1]], Agent [i_C [1.0]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_A [0.0]], Agent [i_C [1.0]], Agent [i_B [0.1]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_B [0.1]], Agent [i_A [0.0]], Agent [i_C [1.0]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_B [0.1]], Agent [i_C [1.0]], Agent [i_A [0.0]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_C [1.0]], Agent [i_A [0.0]], Agent [i_B [0.1]])
+        let bond_ABtoC [] in
+          let bond_AtoB [0.1] in
+            (Agent [i_C [1.0]], Agent [i_B [0.1]], Agent [i_A [0.0]])"#]];
+    species.assert_eq(&generator.species(3).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
         bond_AB []
@@ -176,12 +197,12 @@ fn generate_network() {
               TyAgent [i_C [0.0]],
               let [bond_AtoB [0.1]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
             )"#]];
-    transitions.assert_eq(&generator.transitions(2).join("\n"));
+    transitions.assert_eq(&generator.transitions(3).join("\n"));
 }
 
 // --- Molecular coarse graining --- //
 
-fn signature_v2() -> Signature {
+fn signature_mcg() -> Signature {
     Signature::parse([
         // Sorts
         SignatureDecl::sort("TyAgent"),
@@ -211,13 +232,13 @@ fn signature_v2() -> Signature {
 }
 
 // Generates Model.
-fn model_v2() -> Model {
+fn model_mcg() -> Model {
     let decls = model_decl();
-    Model::parse(signature_v2(), decls).unwrap()
+    Model::parse(signature_mcg(), decls).unwrap()
 }
 
 #[test]
-fn parse_signature_v2() {
+fn parse_signature_mcg() {
     let expected = expect![[r#"
         #/ sorts:
         TyAgent
@@ -235,11 +256,11 @@ fn parse_signature_v2() {
         bond_AtoB : [SiteAB] → ⊗ [SiteA, SiteB]
         bond_ABtoC : [] → ⊗ [SiteAB, SiteC]
     "#]];
-    expected.assert_eq(&signature_v2().to_string());
+    expected.assert_eq(&signature_mcg().to_string());
 }
 
 #[test]
-fn parse_model_v2() {
+fn parse_model_mcg() {
     let expected = expect![[r#"
         #/ sorts:
         TyAgent
@@ -262,26 +283,28 @@ fn parse_model_v2() {
         [] : [] ⊢
           bond_AB []
             : (TyAgent [i_A [empty_A []]], TyAgent [i_B [empty_B []]])
-            → let [bond_AB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
+            → let [bond_AtoB [empty_AB []]] in
+              (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
         [] : [] ⊢
           bond_ABC []
             : (
-              let [bond_AB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]]),
+              let [bond_AtoB [empty_AB []]] in
+                (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]]),
               TyAgent [i_C [empty_C []]]
             )
-            → let bond_ABC [] in
+            → let bond_ABtoC [] in
               (
                 TyAgent [i_C [0.0]],
-                let [bond_AB [0.1]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
+                let [bond_AtoB [0.1]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
               )
     "#]];
-    expected.assert_eq(&model_v2().to_string());
+    expected.assert_eq(&model_mcg().to_string());
 }
 
 #[test]
-fn generate_network_v2() {
+fn generate_network_mcg() {
     use itertools::Itertools;
-    let model = model_v2();
+    let model = model_mcg();
     let generator = NetGenerator::new(&model);
 
     let species = expect![[r#"
@@ -289,21 +312,21 @@ fn generate_network_v2() {
         Agent [i_C [empty_C []]]
         let bond_ABtoC [] in (Agent [i_AB [0.0]], Agent [i_C [0.1]])
         let bond_ABtoC [] in (Agent [i_C [0.1]], Agent [i_AB [0.0]])"#]];
-    species.assert_eq(&generator.species(2).join("\n")); // Symmetry issues
+    species.assert_eq(&generator.species(3).join("\n")); // Symmetry issues
 
     let transitions = expect![[r#"
         bond_AB []
           : (TyAgent [i_A [empty_A []]], TyAgent [i_B [empty_B []]])
-          → let [bond_AB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
+          → let [bond_AtoB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
         bond_ABC []
           : (
-            let [bond_AB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]]),
+            let [bond_AtoB [empty_AB []]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]]),
             TyAgent [i_C [empty_C []]]
           )
-          → let bond_ABC [] in
+          → let bond_ABtoC [] in
             (
               TyAgent [i_C [0.0]],
-              let [bond_AB [0.1]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
+              let [bond_AtoB [0.1]] in (TyAgent [i_A [0.0]], TyAgent [i_B [0.1]])
             )"#]];
-    transitions.assert_eq(&generator.transitions(2).join("\n"));
+    transitions.assert_eq(&generator.transitions(3).join("\n"));
 }
