@@ -40,9 +40,16 @@ fn main_signature() -> Signature {
     .unwrap()
 }
 
+enum Remove {
+    Nothing,
+    A,
+    B,
+    K,
+}
+
 /// Grounding signature.
-fn grounding_signature(skip_b: bool) -> Signature {
-    let d1 = [
+fn grounding_signature(remove: Remove) -> Signature {
+    let mut d = vec![
         // Sorts (Separation layer to `[]`)
         SignatureDecl::sort("S_k"),
         SignatureDecl::sort("S_b"),
@@ -52,25 +59,23 @@ fn grounding_signature(skip_b: bool) -> Signature {
         SignatureDecl::operation("!b", [], Ty::sort("S_b")),
         SignatureDecl::operation("!a", [], Ty::sort("S_a")),
     ];
-    let d2 = [
-        // Sorts (Separation layer to `[]`)
-        SignatureDecl::sort("S_k"),
-        SignatureDecl::sort("S_a"),
-        // Operations
-        SignatureDecl::operation("!k", [], Ty::sort("S_k")),
-        SignatureDecl::operation("!a", [], Ty::sort("S_a")),
-    ];
-    if skip_b {
-        Signature::parse(d2).unwrap()
-    } else {
-        Signature::parse(d1).unwrap()
-    }
+    let (sort_idx, op_idx) = match remove {
+        Remove::Nothing => return Signature::parse(d).unwrap(),
+        Remove::A => (2, 5),
+        Remove::B => (1, 4),
+        Remove::K => (0, 3),
+    };
+
+    d.remove(op_idx);
+    d.remove(sort_idx);
+
+    Signature::parse(d).unwrap()
 }
 
 /// Full signature.
-fn signature(skip_b: bool) -> Signature {
+fn signature(r: Remove) -> Signature {
     let sig1 = main_signature();
-    let sig2 = grounding_signature(skip_b);
+    let sig2 = grounding_signature(r);
     merge_signatures(&[sig1, sig2])
 }
 
@@ -124,12 +129,12 @@ fn model_decl() -> [ModelDecl; 3] {
 }
 
 // Generates Model.
-fn model(skip_b: bool) -> Model {
+fn model(r: Remove) -> Model {
     let decls = model_decl();
-    Model::parse(signature(skip_b), decls).unwrap()
+    Model::parse(signature(r), decls).unwrap()
 }
 
-// With B
+// Remove nothing
 #[test]
 fn parse_signature() {
     let expected = expect![[r#"
@@ -154,7 +159,7 @@ fn parse_signature() {
         !b : [] → S_b
         !a : [] → S_a
     "#]];
-    expected.assert_eq(&signature(false).to_string());
+    expected.assert_eq(&signature(Remove::Nothing).to_string());
 }
 
 #[test]
@@ -192,13 +197,13 @@ fn parse_model() {
             : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
             → (Agent [i_A [unphos [p]]], Agent [i_K [k]])
     "#]];
-    expected.assert_eq(&model(false).to_string());
+    expected.assert_eq(&model(Remove::Nothing).to_string());
 }
 
 #[test]
 fn generate_network() {
     use itertools::Itertools;
-    let model = model(false);
+    let model = model(Remove::Nothing);
     let generator = NetGenerator::new(&model);
 
     let species = expect![[r#"
@@ -242,9 +247,88 @@ fn generate_network() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
+// Without A
+#[test]
+fn parse_signature_no_a() {
+    let expected = expect![[r#"
+        #/ sorts:
+        TyAgent
+        Res
+        SiteA
+        SiteB
+        S_k
+        S_b
+        S_a
+        #/ operations:
+        i_A : [Res, SiteA] → TyAgent
+        i_B : [SiteB] → TyAgent
+        i_K : [S_k] → TyAgent
+        empty_A : [S_a] → SiteA
+        empty_B : [S_b] → SiteB
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !k : [] → S_k
+        !b : [] → S_b
+    "#]];
+    expected.assert_eq(&signature(Remove::A).to_string());
+}
+
+#[test]
+fn parse_model_no_a() {
+    let expected = expect![[r#"
+        #/ sorts:
+        TyAgent
+        Res
+        SiteA
+        SiteB
+        S_k
+        S_b
+        S_a
+        #/ operations:
+        i_A : [Res, SiteA] → TyAgent
+        i_B : [SiteB] → TyAgent
+        i_K : [S_k] → TyAgent
+        empty_A : [S_a] → SiteA
+        empty_B : [S_b] → SiteB
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !k : [] → S_k
+        !b : [] → S_b
+        #/ agents:
+        [a] : [TyAgent] ⊢ Agent [a]
+        #/ rules:
+        [r, a, b] : [Res, S_a, S_b] ⊢
+          bondAB [r, a, b]
+            : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
+            → let bond_AB [(a, b)] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
+        [s, k] : [SiteA, S_k] ⊢
+          phosphorylate [s, k]
+            : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
+            → (Agent [i_A [unphos [p]]], Agent [i_K [k]])
+    "#]];
+    expected.assert_eq(&model(Remove::A).to_string());
+}
+
+#[test]
+fn generate_network_no_a() {
+    use itertools::Itertools;
+    let model = model(Remove::A);
+    let generator = NetGenerator::new(&model);
+
+    let species = expect![[r#"
+        Agent [i_B [empty_B [!b []]]]
+        Agent [i_K [!k []]]"#]];
+    species.assert_eq(&generator.species(2).join("\n"));
+
+    let transitions = expect![""];
+    transitions.assert_eq(&generator.transitions(2).join("\n"));
+}
+
 // Without B
 #[test]
-fn parse_signature_no_kinase() {
+fn parse_signature_no_b() {
     let expected = expect![[r#"
         #/ sorts:
         TyAgent
@@ -266,11 +350,11 @@ fn parse_signature_no_kinase() {
         !k : [] → S_k
         !a : [] → S_a
     "#]];
-    expected.assert_eq(&signature(true).to_string());
+    expected.assert_eq(&signature(Remove::B).to_string());
 }
 
 #[test]
-fn parse_model_no_kinase() {
+fn parse_model_no_b() {
     let expected = expect![[r#"
         #/ sorts:
         TyAgent
@@ -303,13 +387,13 @@ fn parse_model_no_kinase() {
             : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
             → (Agent [i_A [unphos [p]]], Agent [i_K [k]])
     "#]];
-    expected.assert_eq(&model(true).to_string());
+    expected.assert_eq(&model(Remove::B).to_string());
 }
 
 #[test]
-fn generate_network_no_kinase() {
+fn generate_network_no_b() {
     use itertools::Itertools;
-    let model = model(true);
+    let model = model(Remove::B);
     let generator = NetGenerator::new(&model);
 
     let species = expect![[r#"
@@ -322,5 +406,107 @@ fn generate_network_no_kinase() {
         phosphorylate [empty_A [!a []], !k []]
           : (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])
           → (Agent [i_A [unphos [p]]], Agent [i_K [!k []]])"#]];
+    transitions.assert_eq(&generator.transitions(2).join("\n"));
+}
+
+// Without A
+#[test]
+fn parse_signature_no_k() {
+    let expected = expect![[r#"
+        #/ sorts:
+        TyAgent
+        Res
+        SiteA
+        SiteB
+        S_k
+        S_b
+        S_a
+        #/ operations:
+        i_A : [Res, SiteA] → TyAgent
+        i_B : [SiteB] → TyAgent
+        i_K : [S_k] → TyAgent
+        empty_A : [S_a] → SiteA
+        empty_B : [S_b] → SiteB
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !b : [] → S_b
+        !a : [] → S_a
+    "#]];
+    expected.assert_eq(&signature(Remove::K).to_string());
+}
+
+#[test]
+fn parse_model_no_k() {
+    let expected = expect![[r#"
+        #/ sorts:
+        TyAgent
+        Res
+        SiteA
+        SiteB
+        S_k
+        S_b
+        S_a
+        #/ operations:
+        i_A : [Res, SiteA] → TyAgent
+        i_B : [SiteB] → TyAgent
+        i_K : [S_k] → TyAgent
+        empty_A : [S_a] → SiteA
+        empty_B : [S_b] → SiteB
+        bond_AB : [⊗ [S_a, S_b]] → ⊗ [SiteA, SiteB]
+        phos : [S_a] → Res
+        unphos : [S_a] → Res
+        !b : [] → S_b
+        !a : [] → S_a
+        #/ agents:
+        [a] : [TyAgent] ⊢ Agent [a]
+        #/ rules:
+        [r, a, b] : [Res, S_a, S_b] ⊢
+          bondAB [r, a, b]
+            : (Agent [i_A [(r, empty_A [a])]], Agent [i_B [empty_B [b]]])
+            → let bond_AB [(a, b)] in (Agent [i_A [(r, 0.0)]], Agent [i_B [0.1]])
+        [s, k] : [SiteA, S_k] ⊢
+          phosphorylate [s, k]
+            : (Agent [i_A [unphos [p]]], Agent [i_K [k]])
+            → (Agent [i_A [unphos [p]]], Agent [i_K [k]])
+    "#]];
+    expected.assert_eq(&model(Remove::K).to_string());
+}
+
+#[test]
+fn generate_network_no_k() {
+    use itertools::Itertools;
+    let model = model(Remove::K);
+    let generator = NetGenerator::new(&model);
+
+    let species = expect![[r#"
+        Agent [i_A [phos [!a []], empty_A [!a []]]]
+        Agent [i_A [unphos [!a []], empty_A [!a []]]]
+        Agent [i_B [empty_B [!b []]]]
+        let bond_AB [!a [], !b []] in
+          (Agent [i_A [phos [!a []], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_A [unphos [!a []], 0.0]], Agent [i_B [0.1]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_B [0.1]], Agent [i_A [phos [!a []], 0.0]])
+        let bond_AB [!a [], !b []] in
+          (Agent [i_B [0.1]], Agent [i_A [unphos [!a []], 0.0]])"#]];
+    species.assert_eq(&generator.species(2).join("\n"));
+
+    let transitions = expect![[r#"
+        bondAB [phos [!a []], !a [], !b []]
+          : (
+            Agent [i_A [(phos [!a []], empty_A [!a []])]],
+            Agent [i_B [empty_B [!b []]]]
+          )
+          → let bond_AB [(!a [], !b [])] in
+            (Agent [i_A [(phos [!a []], 0.0)]], Agent [i_B [0.1]])
+        bondAB [unphos [!a []], !a [], !b []]
+          : (
+            Agent [i_A [(unphos [!a []], empty_A [!a []])]],
+            Agent [i_B [empty_B [!b []]]]
+          )
+          → let bond_AB [(!a [], !b [])] in
+            (Agent [i_A [(unphos [!a []], 0.0)]], Agent [i_B [0.1]])"#]];
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
