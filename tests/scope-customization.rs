@@ -1,4 +1,4 @@
-//! This example shows how we can customize the scope of our vanilla association-phosphorylation model.
+//! This example shows how we can customize the scope of our association-phosphorylation toy model.
 //! This is done by introducing a separation layer between our previous sites and []. In particular,
 //! we choose one separation sort for each of the agents A, B and K. Each site on agent X is connected
 //! to separation sort S_x through a morphism descriping the state of the site. For example: `phos: S_a -> Res`.
