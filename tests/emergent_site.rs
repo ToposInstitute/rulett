@@ -7,7 +7,6 @@
 mod common;
 use common::*;
 use rulett::prelude::name;
-use rulett::theory::SignatureDecl;
 
 /// Main signature.
 fn signature() -> Signature {
