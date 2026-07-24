@@ -200,7 +200,9 @@ fn generate_network() {
     transitions.assert_eq(&generator.transitions(3).join("\n"));
 }
 
-// --- Molecular coarse graining --- //
+// ==========================================
+// --- Molecular coarse graining
+// ==========================================
 
 fn signature_mcg() -> Signature {
     Signature::parse([

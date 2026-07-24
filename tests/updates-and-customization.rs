@@ -9,7 +9,9 @@ mod common;
 use common::*;
 use rulett::prelude::name;
 
-/// --- Basic case --- ///
+// ==========================================
+// --- Basic case ---
+// ==========================================
 
 /// Base signature.
 fn main_signature() -> Signature {
@@ -60,7 +62,7 @@ fn signature() -> Signature {
     merge_signatures(&[sig1, sig2])
 }
 
-// Declares Model.
+/// Declares Model.
 fn model_decl() -> [ModelDecl; 3] {
     use crate::surface::*;
     // Define agent
@@ -93,7 +95,7 @@ fn model_decl() -> [ModelDecl; 3] {
     [agent, phosphorylate_1, phosphorylate_2]
 }
 
-// Generates Model.
+/// Generates Model.
 fn model() -> Model {
     let decls = model_decl();
     Model::parse(signature(), decls).unwrap()
@@ -191,8 +193,9 @@ fn generate_network() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-/// --- Model update: A1 can be phosphorylated also by any K --- ///
-
+// ==========================================
+// --- Model update: A1 can be phosphorylated also by any K
+//
 // TODO: Get this to work for "K2 phosphorylates any A". The first problem here is, that this would require a morphism
 // `phos: I -> SiteA` instead of `phos: I -> SiteA1`. But without `phos: I -> SiteA1` you can no longer generate the fine-grained
 // reaction. This problem may be similar to
@@ -205,7 +208,7 @@ fn generate_network() {
 // to SiteB1 and SiteB2 separately.
 // https://q.uiver.app/#q=WzAsNCxbMSwwLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIiXSxbMCwxLCJTaXRlQTEgXFxvdGltZXMgU2l0ZUIxIl0sWzIsMSwiU2l0ZUExIFxcb3RpbWVzIFNpdGVCMiJdLFsxLDIsIkkiXSxbMSwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjF9IiwxXSxbMiwwLCJpZF97QTF9IFxcb3RpbWVzIFxcaW90YV97QjJ9IiwxXSxbMywxLCJib25kX3sxMX0iLDFdLFszLDIsImJvbmRfezEyfSIsMV0sWzMsMCwiYm9uZCIsMSx7InN0eWxlIjp7ImJvZHkiOnsibmFtZSI6ImRhc2hlZCJ9fX1dXQ==
 
-// Knowledge update (generalization)
+/// Knowledge update (generalization)
 fn model_decl_updated() -> [ModelDecl; 3] {
     use crate::surface::*;
     // Define agent
@@ -312,7 +315,9 @@ fn generate_network_updated() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-/// --- Coarse graining (coproduct) --- ///
+// ==========================================
+// --- Coarse graining (coproduct)
+// ==========================================
 
 // Coarse grained signature
 fn grounding_signature_coproduct() -> Signature {
@@ -403,9 +408,11 @@ fn generate_network_updated_coproduct() {
     transitions.assert_eq(&generator.transitions(2).join("\n"));
 }
 
-/// --- Coarse graining (product) --- ///
+// ==========================================
+// --- Coarse graining (product)
+// ==========================================
 
-// Coarse grained signature
+/// Coarse grained signature
 fn grounding_signature_product() -> Signature {
     let d = [
         // Sorts (Separation layer to `[]`)
