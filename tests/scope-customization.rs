@@ -3,7 +3,10 @@
 //! we choose one separation sort for each of the agents A, B and K. Each site on agent X is connected
 //! to separation sort S_x through a morphism descriping the state of the site. For example: `phos: S_a -> Res`.
 //! Users can then select which agents X should be part of the generated reaction network by defining
-//! a unique morphism !x: [] -> S_x. Note that this approach assumes that sites are not shared across agents.
+//! a unique morphism !x: [] -> S_x.
+//!
+//! Note: this approach assumes that sites are not shared across agents; or that each agent has one site that
+//! is not shared with any other agent, while shared sites can always be restricted into I.
 //!
 //! https://q.uiver.app/#q=WzAsMTQsWzEsMCwiXFxtYXRocm17VHlBZ2VudH0iXSxbMCwxLCJcXG1hdGhybXtTaXRlQX0gXFxvdGltZXMgXFxtYXRocm17UmVzfSJdLFsxLDEsIlxcbWF0aHJte1NpdGVCfSJdLFsyLDEsIlNfayJdLFszLDAsIlxcbWF0aHJte1NpdGVBfSJdLFs0LDAsIlxcbWF0aHJte1NpdGVCfSJdLFs1LDAsIlxcbWF0aHJte1NpdGVBfSBcXG90aW1lcyBcXG1hdGhybXtTaXRlQn0iXSxbNiwwLCJcXG1hdGhybXtSZXN9Il0sWzMsMSwiU19hIl0sWzYsMSwiU19hIl0sWzAsMCwiXFxtYXRoc2Z7VH0iXSxbNCwxLCJTX2IiXSxbNSwxLCJTX2EgXFxvdGltZXMgU19iIl0sWzMsMiwiSSJdLFsxLDAsIlxcaW90YV9BIl0sWzIsMCwiXFxpb3RhX0IiLDJdLFszLDAsIlxcaW90YV9LIiwyXSxbOSw3LCJcXG1hdGhybXtwaG9zfSIsMCx7ImN1cnZlIjotMX1dLFs5LDcsIlxcbWF0aHJte3VucGhvc30iLDIseyJjdXJ2ZSI6MX1dLFs4LDQsIlxcbWF0aHJte2VtcHR5X0F9IiwxXSxbMTEsNSwiXFxtYXRocm17ZW1wdHlfQn0iLDFdLFsxMiw2LCJcXG1hdGhybXtib25kX3tBQn19IiwxXSxbMTMsMywiIWsiXSxbMTMsOCwiIWEiLDFdLFsxMywxMSwiIWIiLDIseyJjb2xvdXIiOlswLDAsNTBdfSxbMCwwLDUwLDFdXV0=
 
