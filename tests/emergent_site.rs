@@ -4,6 +4,7 @@
 //!
 //! https://q.uiver.app/#q=WzAsNyxbMSwwLCJTaXRlQSBcXG90aW1lcyBTaXRlQiJdLFsxLDEsIlNpdGVBQiJdLFsxLDIsIkkiXSxbMCwyLCJTaXRlQSJdLFsyLDIsIlNpdGVCIl0sWzMsMCwiU2l0ZUFCIFxcb3RpbWVzIFNpdGVDIl0sWzMsMiwiSSJdLFsxLDAsImJvbmRfe0F0b0J9Il0sWzIsMSwiZW1wdHlfe0FCfSJdLFsyLDMsImVtcHR5X0EiLDJdLFsyLDQsImVtcHR5X0IiLDJdLFs2LDUsImJvbmRfe0FCdG9DfSIsMl1d
 
+#[allow(dead_code)]
 mod common;
 use common::*;
 use rulett::prelude::name;
