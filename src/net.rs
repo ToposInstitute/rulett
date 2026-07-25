@@ -2,7 +2,12 @@
 
 use std::fmt;
 use std::fs::File;
-use std::io::Write;
+
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::writer::Writer;
+use std::collections::HashMap;
+use std::io::{BufWriter, Write};
+use std::path::Path;
 
 use super::{core::*, prelude::*};
 
@@ -89,93 +94,96 @@ impl Net {
         Ok(self.transitions.insert(tm, (src, tgt)).is_none())
     }
 
-    pub fn export_sbml(&self, file_name: &str) -> Result<(), String> {
-        let model_name = file_name.split('.').next().unwrap_or(file_name).to_string();
-
-        let file = File::create(file_name).map_err(|e| e.to_string())?;
-        let mut writer = file;
+    pub fn write_sbml<P: AsRef<Path>>(&self, path: P) -> Result<(), quick_xml::Error> {
+        let model_name = path
+            .as_ref()
+            .file_stem() // Extracts the file stem as Option<&OsStr>
+            .and_then(|s: &std::ffi::OsStr| s.to_str())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Invalid or missing model name file stem",
+                )
+            })?;
 
         let species: Vec<String> = self.species().map(|tm| tm.to_string()).collect();
         let reactions: Vec<(&PatTm, &Vec<usize>, &Vec<usize>)> = self.transitions().collect();
 
-        write_line(&mut writer, r#"<?xml version="1.0" encoding="UTF-8"?>"#)?;
-        write_line(
-            &mut writer,
-            r#"<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">"#,
-        )?;
-        write_line(
-            &mut writer,
-            &format!(
-                " <model id=\"{}\" name=\"{}\">",
-                xml_escape(&model_name),
-                xml_escape(&model_name)
-            ),
-        )?;
-        write_line(&mut writer, " <listOfCompartments>")?;
-        write_line(
-            &mut writer,
-            " <compartment id=\"default\" name=\"default\" size=\"1\" constant=\"true\"/>",
-        )?;
-        write_line(&mut writer, " </listOfCompartments>")?;
-        write_line(&mut writer, " <listOfSpecies>")?;
+        let file = File::create(&path)?;
+        let mut writer = Writer::new_with_indent(BufWriter::new(file), b' ', 2);
 
-        for (index, name) in species.iter().enumerate() {
-            write_line(
-                &mut writer,
-                &format!(
-                    " <species id=\"species_{}\" name=\"{}\" compartment=\"default\" initialAmount=\"1\" hasOnlySubstanceUnits=\"true\"/>",
-                    index,
-                    xml_escape(name)
-                ),
-            )?;
+        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+
+        let mut sbml = BytesStart::new("sbml");
+        sbml.push_attribute(("xmlns", "http://www.sbml.org/sbml/level3/version2/core"));
+        sbml.push_attribute(("level", "3"));
+        sbml.push_attribute(("version", "2"));
+        writer.write_event(Event::Start(sbml))?;
+
+        let mut model = BytesStart::new("model");
+        model.push_attribute(("id", model_name));
+        model.push_attribute(("name", model_name));
+        writer.write_event(Event::Start(model))?;
+
+        // --- compartments ---
+        writer.write_event(Event::Start(BytesStart::new("listOfCompartments")))?;
+        let mut compartment = BytesStart::new("compartment");
+        compartment.push_attribute(("id", "default"));
+        compartment.push_attribute(("size", "1"));
+        compartment.push_attribute(("constant", "true"));
+        writer.write_event(Event::Empty(compartment))?;
+        writer.write_event(Event::End(BytesEnd::new("listOfCompartments")))?;
+
+        // --- species ---
+        writer.write_event(Event::Start(BytesStart::new("listOfSpecies")))?;
+        for (i, name) in species.iter().enumerate() {
+            let id = format!("s_{}", i);
+            let mut sp = BytesStart::new("species");
+            sp.push_attribute(("id", id.as_str()));
+            sp.push_attribute(("name", name.as_str()));
+            sp.push_attribute(("compartment", "default"));
+            sp.push_attribute(("initialAmount", "0"));
+            sp.push_attribute(("hasOnlySubstanceUnits", "true"));
+            // sp.push_attribute(("boundaryCondition", "false"));
+            // sp.push_attribute(("constant", "false"));
+            writer.write_event(Event::Empty(sp))?;
         }
+        writer.write_event(Event::End(BytesEnd::new("listOfSpecies")))?;
 
-        write_line(&mut writer, " </listOfSpecies>")?;
-        write_line(&mut writer, " <listOfReactions>")?;
-
-        for (index, (tm, src, tgt)) in reactions.iter().enumerate() {
-            write_line(
-                &mut writer,
-                &format!(
-                    " <reaction id=\"reaction_{}\" name=\"{}\" reversible=\"false\">",
-                    index,
-                    xml_escape(&tm.to_string())
-                ),
-            )?;
-            write_line(&mut writer, " <listOfReactants>")?;
-            for &src_idx in src.iter() {
-                write_line(
-                    &mut writer,
-                    &format!(
-                        " <speciesReference species=\"species_{}\" stoichiometry=\"1\" constant=\"true\"/>",
-                        src_idx
-                    ),
-                )?;
-            }
-            write_line(&mut writer, " </listOfReactants>")?;
-            write_line(&mut writer, " <listOfProducts>")?;
-            for &tgt_idx in tgt.iter() {
-                write_line(
-                    &mut writer,
-                    &format!(
-                        " <speciesReference species=\"species_{}\" stoichiometry=\"1\" constant=\"true\"/>",
-                        tgt_idx
-                    ),
-                )?;
-            }
-            write_line(&mut writer, " </listOfProducts>")?;
-
-            let rate_constant_id = format!("k{}", index);
-            let math = build_mass_action_math(&rate_constant_id, &src);
-            write_line(&mut writer, " <kineticLaw>")?;
-            write_line(&mut writer, &format!(" {}", math))?;
-            write_line(&mut writer, " </kineticLaw>")?;
-            write_line(&mut writer, " </reaction>")?;
+        // --- global rate constants ---
+        writer.write_event(Event::Start(BytesStart::new("listOfParameters")))?;
+        for i in 0..reactions.len() {
+            let id = format!("k_{}", i);
+            let mut param = BytesStart::new("parameter");
+            param.push_attribute(("id", id.as_str()));
+            param.push_attribute(("value", "1")); // placeholder; edit as needed
+            param.push_attribute(("constant", "true"));
+            writer.write_event(Event::Empty(param))?;
         }
+        writer.write_event(Event::End(BytesEnd::new("listOfParameters")))?;
 
-        write_line(&mut writer, " </listOfReactions>")?;
-        write_line(&mut writer, " </model>")?;
-        write_line(&mut writer, "</sbml>")?;
+        // --- reactions ---
+        writer.write_event(Event::Start(BytesStart::new("listOfReactions")))?;
+        for (i, (tm, reactants, products)) in reactions.iter().enumerate() {
+            let reaction_id = format!("r_{}", i);
+            let mut reaction = BytesStart::new("reaction");
+            reaction.push_attribute(("id", reaction_id.as_str()));
+            reaction.push_attribute(("name", tm.to_string().as_str()));
+            reaction.push_attribute(("reversible", "false"));
+            writer.write_event(Event::Start(reaction))?;
+
+            write_species_reference_list(&mut writer, "listOfReactants", reactants)?;
+            write_species_reference_list(&mut writer, "listOfProducts", products)?;
+            write_mass_action_rate_law(&mut writer, i, reactants)?;
+
+            writer.write_event(Event::End(BytesEnd::new("reaction")))?;
+        }
+        writer.write_event(Event::End(BytesEnd::new("listOfReactions")))?;
+
+        writer.write_event(Event::End(BytesEnd::new("model")))?;
+        writer.write_event(Event::End(BytesEnd::new("sbml")))?;
+
+        writer.into_inner().flush()?;
         Ok(())
     }
 }
@@ -198,68 +206,125 @@ impl fmt::Display for Net {
     }
 }
 
-fn write_line(writer: &mut impl Write, line: &str) -> Result<(), String> {
-    writer.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
-    writer.write_all(b"\n").map_err(|e| e.to_string())
-}
-
-fn build_mass_action_math(rate_constant_id: &str, reactant_idxs: &[usize]) -> String {
-    let mut math = String::new();
-    math.push_str(r#"<math xmlns="http://www.w3.org/1998/Math/MathML">"#);
-    math.push_str("<apply><times/>");
-    math.push_str(&format!("<ci>{}</ci>", xml_escape(rate_constant_id)));
-    for reactant in reactant_idxs.iter() {
-        math.push_str(&format!("<ci>species_{}</ci>", reactant));
+/// Collapses a list of species indices into (index, stoichiometry) pairs,
+/// sorted by index for stable output.
+fn count_species(indices: &[usize]) -> Vec<(usize, usize)> {
+    let mut counts: HashMap<usize, usize> = HashMap::new();
+    for &idx in indices {
+        *counts.entry(idx).or_insert(0) += 1;
     }
-    math.push_str("</apply>");
-    math.push_str("</math>");
-    math
+    let mut v: Vec<(usize, usize)> = counts.into_iter().collect();
+    v.sort_by_key(|&(idx, _)| idx);
+    v
 }
 
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&apos;")
+fn write_species_reference_list<W: Write>(
+    writer: &mut Writer<W>,
+    tag: &str,
+    indices: &[usize],
+) -> Result<(), quick_xml::Error> {
+    if indices.is_empty() {
+        return Ok(());
+    }
+    writer.write_event(Event::Start(BytesStart::new(tag)))?;
+    for (idx, count) in count_species(indices) {
+        let species_id = format!("s_{}", idx);
+        let stoich = count.to_string();
+        let mut sr = BytesStart::new("speciesReference");
+        sr.push_attribute(("species", species_id.as_str()));
+        sr.push_attribute(("stoichiometry", stoich.as_str()));
+        sr.push_attribute(("constant", "true"));
+        writer.write_event(Event::Empty(sr))?;
+    }
+    writer.write_event(Event::End(BytesEnd::new(tag)))?;
+    Ok(())
+}
+
+/// Writes a <kineticLaw> with mass-action kinetics: k * prod(reactant_i ^ stoichiometry_i)
+fn write_mass_action_rate_law<W: Write>(
+    writer: &mut Writer<W>,
+    reaction_index: usize,
+    reactants: &[usize],
+) -> Result<(), quick_xml::Error> {
+    let k_id = format!("k_{}", reaction_index);
+    let counts = count_species(reactants);
+    let num_factors = 1 + counts.len(); // rate constant + one term per distinct reactant
+
+    writer.write_event(Event::Start(BytesStart::new("kineticLaw")))?;
+
+    let mut math = BytesStart::new("math");
+    math.push_attribute(("xmlns", "http://www.w3.org/1998/Math/MathML"));
+    writer.write_event(Event::Start(math))?;
+
+    if num_factors > 1 {
+        writer.write_event(Event::Start(BytesStart::new("apply")))?;
+        writer.write_event(Event::Empty(BytesStart::new("times")))?;
+    }
+
+    write_ci(writer, &k_id)?;
+
+    for (sp_idx, count) in counts {
+        let sp_id = format!("s_{}", sp_idx);
+        if count > 1 {
+            writer.write_event(Event::Start(BytesStart::new("apply")))?;
+            writer.write_event(Event::Empty(BytesStart::new("power")))?;
+            write_ci(writer, &sp_id)?;
+            write_cn(writer, count)?;
+            writer.write_event(Event::End(BytesEnd::new("apply")))?;
+        } else {
+            write_ci(writer, &sp_id)?;
+        }
+    }
+
+    if num_factors > 1 {
+        writer.write_event(Event::End(BytesEnd::new("apply")))?;
+    }
+
+    writer.write_event(Event::End(BytesEnd::new("math")))?;
+    writer.write_event(Event::End(BytesEnd::new("kineticLaw")))?;
+    Ok(())
+}
+
+fn write_ci<W: Write>(writer: &mut Writer<W>, name: &str) -> Result<(), quick_xml::Error> {
+    writer.write_event(Event::Start(BytesStart::new("ci")))?;
+    writer.write_event(Event::Text(BytesText::new(name)))?;
+    writer.write_event(Event::End(BytesEnd::new("ci")))?;
+    Ok(())
+}
+
+fn write_cn<W: Write>(writer: &mut Writer<W>, value: usize) -> Result<(), quick_xml::Error> {
+    let value_str = value.to_string();
+    writer.write_event(Event::Start(BytesStart::new("cn")))?;
+    writer.write_event(Event::Text(BytesText::new(&value_str)))?;
+    writer.write_event(Event::End(BytesEnd::new("cn")))?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{super::model, super::netgen::NetGenerator};
-    use expect_test::expect;
-    use itertools::Itertools;
+    use insta;
     use std::fs;
 
-    // Test output of toy_model_v1
+    // Test output of toy_model_v2
     #[test]
     fn toy_model_v2() {
-        let model = model::toy_model_v1();
+        use tempfile;
+
+        let model = model::toy_model_v2();
         let generator = NetGenerator::new(&model);
-        let species = expect![[r#"
-        A [unphos [], empty []]
-        A [phos [], empty []]
-        B [empty []]
-        K []
-        let bond [] in (A [unphos [], 0.0], A [unphos [], 0.1])
-        let bond [] in (A [unphos [], 0.0], A [phos [], 0.1])
-        let bond [] in (A [phos [], 0.0], A [unphos [], 0.1])
-        let bond [] in (A [phos [], 0.0], A [phos [], 0.1])
-        let bond [] in (A [unphos [], 0.0], B [0.1])
-        let bond [] in (A [phos [], 0.0], B [0.1])
-        let bond [] in (B [0.0], B [0.1])"#]];
-        species.assert_eq(&generator.species(2).join("\n")); // method not found in `impl Iterator<Item = core::tm::PatTm>
 
-        // "tests/fixtures/toy_model_v1.xml", but OS independent version
-        let file_path = "tests/fixtures/toy_model_v1.xml";
-        generator.net(2).export_sbml(file_path).unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("toy_model_v2.xml");
+        generator.net(2).write_sbml(&file_path).unwrap();
 
-        // 2. Read the content of the generated file
         let actual_content =
             fs::read_to_string(&file_path).expect("Failed to read actual file output");
 
-        // 3. Compare it against a snapshot reference file
-        insta::assert_snapshot!("expected_report_snapshot", actual_content);
+        let mut settings = insta::Settings::clone_current();
+        settings.set_snapshot_path("../tests/snapshots");
+        settings.bind(|| {
+            insta::assert_snapshot!("expected_report_snapshot", actual_content);
+        });
     }
 }
