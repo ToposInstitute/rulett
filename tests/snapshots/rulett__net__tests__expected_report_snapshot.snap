@@ -9,10 +9,10 @@ expression: actual_content
       <compartment id="default" size="1" constant="true"/>
     </listOfCompartments>
     <listOfSpecies>
-      <species id="s_0" name="A [unphos [], emptyA []]" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
+      <species id="s_0" name="A [unphos [], emptyA []]" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
       <species id="s_1" name="A [phos [], emptyA []]" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
       <species id="s_2" name="B [emptyB []]" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
-      <species id="s_3" name="K []" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
+      <species id="s_3" name="K []" compartment="default" initialAmount="1" hasOnlySubstanceUnits="true"/>
       <species id="s_4" name="let bond [] in (A [unphos [], 0.0], B [0.1])" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
       <species id="s_5" name="let bond [] in (A [phos [], 0.0], B [0.1])" compartment="default" initialAmount="0" hasOnlySubstanceUnits="true"/>
     </listOfSpecies>

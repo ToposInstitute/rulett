@@ -94,7 +94,11 @@ impl Net {
         Ok(self.transitions.insert(tm, (src, tgt)).is_none())
     }
 
-    pub fn write_sbml<P: AsRef<Path>>(&self, path: P) -> Result<(), quick_xml::Error> {
+    pub fn write_sbml<P: AsRef<Path>>(
+        &self,
+        path: P,
+        initial_amounts: Option<HashMap<String, f64>>,
+    ) -> Result<(), quick_xml::Error> {
         let model_name = path
             .as_ref()
             .file_stem() // Extracts the file stem as Option<&OsStr>
@@ -138,11 +142,17 @@ impl Net {
         writer.write_event(Event::Start(BytesStart::new("listOfSpecies")))?;
         for (i, name) in species.iter().enumerate() {
             let id = format!("s_{}", i);
+            let ia = initial_amounts
+                .as_ref()
+                .and_then(|amounts| amounts.get(name))
+                .copied()
+                .unwrap_or(0.0)
+                .to_string();
             let mut sp = BytesStart::new("species");
             sp.push_attribute(("id", id.as_str()));
             sp.push_attribute(("name", name.as_str()));
             sp.push_attribute(("compartment", "default"));
-            sp.push_attribute(("initialAmount", "0"));
+            sp.push_attribute(("initialAmount", ia.as_str()));
             sp.push_attribute(("hasOnlySubstanceUnits", "true"));
             // sp.push_attribute(("boundaryCondition", "false"));
             // sp.push_attribute(("constant", "false"));
@@ -316,7 +326,11 @@ mod tests {
 
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("toy_model_v2.xml");
-        generator.net(2).write_sbml(&file_path).unwrap();
+        let initial_amounts = std::collections::HashMap::from([
+            (String::from("A [unphos [], emptyA []]"), 1.0),
+            (String::from("K []"), 1.0), // TODO: make this work for Int, too.
+        ]);
+        generator.net(2).write_sbml(&file_path, Some(initial_amounts)).unwrap();
 
         let actual_content =
             fs::read_to_string(&file_path).expect("Failed to read actual file output");
