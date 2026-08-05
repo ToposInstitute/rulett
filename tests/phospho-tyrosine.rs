@@ -2,6 +2,7 @@
 //! of one of the sites. A prominent example is binding of the SH2 domain to phosphorylated
 //! tyrosine residues, which is desribed by this test case
 
+#[allow(dead_code)]
 mod common;
 use common::*;
 
